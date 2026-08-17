@@ -98,12 +98,11 @@
 <script>
 const LIFF_ID = '2009269118-FhJVRpRo';
 
-const qs = new URLSearchParams(location.search);
-const ORDER_NO = qs.get('order') || '';
-const TOKEN = qs.get('token') || '';
-const API_URL = qs.get('api') || '';
-const PRODUCT = qs.get('product') || '';
-const TOTAL = qs.get('total') || '';
+let ORDER_NO = '';
+let TOKEN = '';
+let API_URL = '';
+let PRODUCT = '';
+let TOTAL = '';
 
 let LINE_USER_ID = '';
 let LINE_DISPLAY_NAME = '';
@@ -112,22 +111,199 @@ let LINE_ID_TOKEN = '';
 let IS_FRIEND = false;
 let LIFF_OK = false;
 
+
 function money(v){
   const n = Number(v || 0);
   return '$' + n.toLocaleString('zh-TW');
 }
 
+
 function setStatus(text, type=''){
   const el = document.getElementById('lineStatus');
   el.textContent = text;
-  el.style.color = type === 'ok' ? '#19873b' : type === 'warn' ? '#9a6700' : type === 'error' ? '#a40000' : '#777';
+  el.style.color =
+    type === 'ok'
+      ? '#19873b'
+      : type === 'warn'
+        ? '#9a6700'
+        : type === 'error'
+          ? '#a40000'
+          : '#777';
 }
+
 
 function showError(msg){
   const el = document.getElementById('error');
   el.textContent = msg;
   el.style.display = 'block';
 }
+
+
+function readOrderParamsAfterLiffInit(){
+
+  // LINE 官方規格：
+  // LIFF URL 上的附加參數在 primary redirect 時會先放在 liff.state，
+  // liff.init() resolve 後才會還原到 location.search。
+  const qs =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  ORDER_NO =
+    qs.get('order') || '';
+
+  TOKEN =
+    qs.get('token') || '';
+
+  API_URL =
+    qs.get('api') || '';
+
+  PRODUCT =
+    qs.get('product') || '';
+
+  TOTAL =
+    qs.get('total') || '';
+
+
+  // 防呆：若某些環境仍殘留 liff.state，僅讀取、不修改它。
+  if (
+    (!ORDER_NO || !TOKEN || !API_URL) &&
+    qs.get('liff.state')
+  ) {
+
+    try {
+
+      const state =
+        decodeURIComponent(
+          qs.get('liff.state')
+        );
+
+      const queryPart =
+        state.includes('?')
+          ? state.substring(
+              state.indexOf('?') + 1
+            )
+          : state.replace(
+              /^\/+/,
+              ''
+            );
+
+      const sp =
+        new URLSearchParams(
+          queryPart
+        );
+
+      ORDER_NO =
+        ORDER_NO ||
+        sp.get('order') ||
+        '';
+
+      TOKEN =
+        TOKEN ||
+        sp.get('token') ||
+        '';
+
+      API_URL =
+        API_URL ||
+        sp.get('api') ||
+        '';
+
+      PRODUCT =
+        PRODUCT ||
+        sp.get('product') ||
+        '';
+
+      TOTAL =
+        TOTAL ||
+        sp.get('total') ||
+        '';
+
+    } catch (err) {
+
+      console.warn(
+        'liff.state 解析失敗',
+        err
+      );
+    }
+  }
+}
+
+
+function renderOrder(){
+
+  if(
+    !ORDER_NO ||
+    !TOKEN ||
+    !API_URL
+  ){
+
+    document
+      .getElementById(
+        'loading'
+      )
+      .textContent =
+        '訂單連結不完整，請重新掃描門市提供的 QR Code。';
+
+    return false;
+  }
+
+
+  document
+    .getElementById(
+      'customerForm'
+    )
+    .action =
+      API_URL;
+
+
+  document
+    .getElementById(
+      'orderNo'
+    )
+    .textContent =
+      '訂單編號：' +
+      ORDER_NO;
+
+
+  document
+    .getElementById(
+      'product'
+    )
+    .textContent =
+      PRODUCT ||
+      '門市訂購商品';
+
+
+  document
+    .getElementById(
+      'total'
+    )
+    .textContent =
+      '訂單金額：' +
+      money(
+        TOTAL
+      );
+
+
+  document
+    .getElementById(
+      'loading'
+    )
+    .style.display =
+      'none';
+
+
+  document
+    .getElementById(
+      'app'
+    )
+    .style.display =
+      'block';
+
+
+  return true;
+}
+
 
 function syncHidden(){
   document.getElementById('fOrderNo').value = ORDER_NO;
@@ -138,147 +314,368 @@ function syncHidden(){
   document.getElementById('fLineIdToken').value = LINE_ID_TOKEN;
 }
 
+
 function updateSubmit(){
-  const btn = document.getElementById('submitBtn');
-  if (LIFF_OK && IS_FRIEND) {
-    btn.disabled = false;
-    btn.textContent = '確認送出收件資料';
-  } else if (LIFF_OK && !IS_FRIEND) {
-    btn.disabled = true;
-    btn.textContent = '請先加入 LINE 好友';
+  const btn =
+    document.getElementById(
+      'submitBtn'
+    );
+
+  if (
+    LIFF_OK &&
+    IS_FRIEND
+  ) {
+
+    btn.disabled =
+      false;
+
+    btn.textContent =
+      '確認送出收件資料';
+
+  } else if (
+    LIFF_OK &&
+    !IS_FRIEND
+  ) {
+
+    btn.disabled =
+      true;
+
+    btn.textContent =
+      '請先加入 LINE 好友';
+
   } else {
-    btn.disabled = true;
-    btn.textContent = 'LINE 連結中...';
+
+    btn.disabled =
+      true;
+
+    btn.textContent =
+      'LINE 連結中...';
   }
 }
 
-async function checkFriend(){
-  try{
-    const r = await liff.getFriendship();
-    IS_FRIEND = !!(r && r.friendFlag);
-    document.getElementById('friendBox').classList.toggle('show', !IS_FRIEND);
 
-    if(IS_FRIEND){
+async function checkFriend(){
+
+  try{
+
+    const r =
+      await liff.getFriendship();
+
+    IS_FRIEND =
+      !!(
+        r &&
+        r.friendFlag
+      );
+
+
+    document
+      .getElementById(
+        'friendBox'
+      )
+      .classList.toggle(
+        'show',
+        !IS_FRIEND
+      );
+
+
+    if(
+      IS_FRIEND
+    ){
+
       setStatus(
         LINE_DISPLAY_NAME
           ? `LINE 已連結：${LINE_DISPLAY_NAME}｜已加入官方帳號`
           : 'LINE 身分已連結｜已加入官方帳號',
         'ok'
       );
-    }else{
-      setStatus('LINE 已連結，但尚未加入 YOKA 官方帳號', 'warn');
+
+    } else {
+
+      setStatus(
+        'LINE 已連結，但尚未加入 YOKA 官方帳號',
+        'warn'
+      );
     }
-  }catch(err){
-    IS_FRIEND = false;
-    document.getElementById('friendBox').classList.add('show');
-    setStatus('無法確認好友狀態，請確認 LIFF 已開啟 profile 權限', 'error');
+
+  } catch(err){
+
+    IS_FRIEND =
+      false;
+
+
+    document
+      .getElementById(
+        'friendBox'
+      )
+      .classList.add(
+        'show'
+      );
+
+
+    setStatus(
+      '無法確認好友狀態，請確認 LIFF 已開啟 profile 權限',
+      'error'
+    );
   }
+
+
   updateSubmit();
+
   return IS_FRIEND;
 }
 
+
 async function requestFriend(){
+
   try{
-    if(typeof liff.requestFriendship === 'function'){
+
+    if(
+      typeof liff.requestFriendship ===
+      'function'
+    ){
+
       await liff.requestFriendship();
+
       await checkFriend();
-    }else{
-      alert('目前 LINE 版本不支援直接加入好友，請先加入 YOKA 官方 LINE 後再回到此頁。');
+
+    } else {
+
+      alert(
+        '目前 LINE 版本不支援直接加入好友，請先加入 YOKA 官方 LINE 後再回到此頁。'
+      );
     }
-  }catch(err){
-    alert('無法開啟加入好友視窗，請確認 LIFF 使用 Full 畫面並已連結 YOKA 官方帳號。');
+
+  } catch(err){
+
+    alert(
+      '無法開啟加入好友視窗，請確認 LIFF 使用 Full 畫面並已連結 YOKA 官方帳號。'
+    );
   }
 }
 
-async function initLiff(){
+
+async function initApp(){
+
   try{
+
+    // ① 一定先初始化 LIFF。
+    // 不可在這之前讀 order/token/api。
     await liff.init({
-      liffId: LIFF_ID,
-      withLoginOnExternalBrowser: true
+      liffId:
+        LIFF_ID,
+      withLoginOnExternalBrowser:
+        true
     });
 
-    if(!liff.isLoggedIn()){
-      setStatus('正在登入 LINE...', 'warn');
+
+    // ② init 完成後，LINE 已把 liff.state 還原成原始參數。
+    readOrderParamsAfterLiffInit();
+
+
+    // ③ 先顯示訂單。
+    if(
+      !renderOrder()
+    ){
       return;
     }
 
-    LINE_ID_TOKEN = liff.getIDToken() || '';
-    LINE_ACCESS_TOKEN = liff.getAccessToken() || '';
 
-    const decoded = liff.getDecodedIDToken();
-    if(decoded && decoded.sub) LINE_USER_ID = decoded.sub;
+    if(
+      !liff.isLoggedIn()
+    ){
 
-    try{
-      const context = liff.getContext();
-      if(!LINE_USER_ID && context && context.userId) LINE_USER_ID = context.userId;
-    }catch(e){}
+      setStatus(
+        '正在登入 LINE...',
+        'warn'
+      );
 
-    try{
-      const profile = await liff.getProfile();
-      LINE_USER_ID = LINE_USER_ID || profile.userId || '';
-      LINE_DISPLAY_NAME = profile.displayName || '';
-    }catch(e){}
-
-    if(!LINE_USER_ID){
-      setStatus('LINE 已登入，但無法取得使用者身分，請確認 openid / profile 權限', 'error');
       return;
     }
 
-    LIFF_OK = true;
+
+    LINE_ID_TOKEN =
+      liff.getIDToken() ||
+      '';
+
+
+    LINE_ACCESS_TOKEN =
+      liff.getAccessToken() ||
+      '';
+
+
+    const decoded =
+      liff.getDecodedIDToken();
+
+
+    if(
+      decoded &&
+      decoded.sub
+    ){
+
+      LINE_USER_ID =
+        decoded.sub;
+    }
+
+
+    try{
+
+      const context =
+        liff.getContext();
+
+
+      if(
+        !LINE_USER_ID &&
+        context &&
+        context.userId
+      ){
+
+        LINE_USER_ID =
+          context.userId;
+      }
+
+    }catch(e){}
+
+
+    try{
+
+      const profile =
+        await liff.getProfile();
+
+
+      LINE_USER_ID =
+        LINE_USER_ID ||
+        profile.userId ||
+        '';
+
+
+      LINE_DISPLAY_NAME =
+        profile.displayName ||
+        '';
+
+    }catch(e){}
+
+
+    if(
+      !LINE_USER_ID
+    ){
+
+      setStatus(
+        'LINE 已登入，但無法取得使用者身分，請確認 openid / profile 權限',
+        'error'
+      );
+
+      return;
+    }
+
+
+    LIFF_OK =
+      true;
+
+
     syncHidden();
+
+
     await checkFriend();
 
+
   }catch(err){
-    console.error(err);
-    setStatus('LINE 連結失敗，請關閉後重新由 LINE 開啟', 'error');
+
+    console.error(
+      err
+    );
+
+
+    document
+      .getElementById(
+        'loading'
+      )
+      .textContent =
+        'LINE LIFF 初始化失敗，請關閉後重新掃描 QR Code。';
   }
 }
 
-document.getElementById('customerForm').addEventListener('submit', async function(e){
-  e.preventDefault();
-  document.getElementById('error').style.display = 'none';
 
-  if(!LIFF_OK || !LINE_USER_ID){
-    showError('LINE 身分尚未完成連結，請稍候後再試。');
-    return;
-  }
+document
+  .getElementById(
+    'customerForm'
+  )
+  .addEventListener(
+    'submit',
+    async function(e){
 
-  const friend = await checkFriend();
-  if(!friend){
-    showError('請先加入 YOKA 官方 LINE 好友後再送出。');
-    return;
-  }
+      e.preventDefault();
 
-  if(!this.reportValidity()) return;
 
-  syncHidden();
+      document
+        .getElementById(
+          'error'
+        )
+        .style.display =
+          'none';
 
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = true;
-  btn.textContent = '資料送出中...';
 
-  // 標準 HTML POST 到 Apps Script。
-  // 不使用 fetch，因此不受跨網域 CORS 限制。
-  this.submit();
-});
+      if(
+        !LIFF_OK ||
+        !LINE_USER_ID
+      ){
 
-(function boot(){
-  if(!ORDER_NO || !TOKEN || !API_URL){
-    document.getElementById('loading').textContent = '訂單連結不完整，請重新掃描門市提供的 QR Code。';
-    return;
-  }
+        showError(
+          'LINE 身分尚未完成連結，請稍候後再試。'
+        );
 
-  document.getElementById('customerForm').action = API_URL;
-  document.getElementById('orderNo').textContent = '訂單編號：' + ORDER_NO;
-  document.getElementById('product').textContent = PRODUCT || '門市訂購商品';
-  document.getElementById('total').textContent = '訂單金額：' + money(TOTAL);
+        return;
+      }
 
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
 
-  syncHidden();
-  initLiff();
-})();
+      const friend =
+        await checkFriend();
+
+
+      if(
+        !friend
+      ){
+
+        showError(
+          '請先加入 YOKA 官方 LINE 好友後再送出。'
+        );
+
+        return;
+      }
+
+
+      if(
+        !this.reportValidity()
+      ){
+        return;
+      }
+
+
+      syncHidden();
+
+
+      const btn =
+        document.getElementById(
+          'submitBtn'
+        );
+
+
+      btn.disabled =
+        true;
+
+
+      btn.textContent =
+        '資料送出中...';
+
+
+      // 標準 HTML POST 到 Apps Script，
+      // 不受 CORS 限制。
+      this.submit();
+    }
+  );
+
+
+// 啟動
+initApp();
 </script>
 </body>
 </html>
