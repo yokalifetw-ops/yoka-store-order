@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#f5f5f5">
+  <title>YOKA 收件資料填寫</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#f5f5f5;color:#222;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",sans-serif}
+    .page{max-width:620px;margin:0 auto;padding:32px 16px 70px}
+    .brand{text-align:center;padding:18px 0 26px}
+    .brand h1{margin:0;font-size:34px;font-weight:900;letter-spacing:.5px}
+    .brand p{margin:8px 0 0;color:#777;font-size:17px}
+    .card{background:#fff;border-radius:20px;padding:22px 18px;box-shadow:0 6px 24px rgba(0,0,0,.05)}
+    .order{background:#fafafa;border-radius:16px;padding:20px;margin-bottom:18px}
+    .order-no{font-size:22px;font-weight:900}
+    .product{font-size:17px;color:#555;margin-top:12px;line-height:1.55}
+    .total{font-size:24px;font-weight:900;margin-top:14px}
+    .line-status{font-size:15px;font-weight:700;margin:0 0 16px;color:#777}
+    .friend{display:none;background:#fff7df;border:1px solid #ead58d;border-radius:14px;padding:16px;margin-bottom:18px;color:#6f5200;line-height:1.55}
+    .friend.show{display:block}
+    .friend strong{display:block;font-size:17px;margin-bottom:5px}
+    label{display:block;font-size:17px;font-weight:900;margin:20px 0 8px}
+    .req{color:#d22}
+    input,textarea{width:100%;border:1px solid #d4d4d4;border-radius:13px;background:#fff;font:inherit;font-size:17px;padding:15px 14px;outline:none}
+    input{height:54px}
+    textarea{min-height:105px;resize:vertical}
+    input:focus,textarea:focus{border-color:#222}
+    .hint{font-size:13px;color:#888;margin-top:7px;line-height:1.5}
+    button{width:100%;border:0;border-radius:13px;min-height:54px;font-size:18px;font-weight:900;cursor:pointer}
+    .friend-btn{background:#06c755;color:#fff;margin-top:12px}
+    .submit{background:#222;color:#fff;margin-top:24px}
+    .submit:disabled{opacity:.45}
+    .error{display:none;margin-top:14px;background:#fff0f0;color:#a40000;border-radius:12px;padding:12px 14px;line-height:1.5}
+    .loading{padding:70px 20px;text-align:center;color:#777}
+    @media(max-width:480px){
+      .page{padding:20px 12px 55px}
+      .brand h1{font-size:30px}
+      .card{padding:18px 14px;border-radius:18px}
+      .order{padding:17px}
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="brand">
+    <h1>YOKA 佑客家具</h1>
+    <p>台中門市｜收件資料填寫</p>
+  </div>
+
+  <div id="loading" class="loading">訂單資料載入中...</div>
+
+  <div id="app" class="card" style="display:none">
+    <div class="order">
+      <div id="orderNo" class="order-no"></div>
+      <div id="product" class="product"></div>
+      <div id="total" class="total"></div>
+    </div>
+
+    <div id="lineStatus" class="line-status">LINE 身分連結中...</div>
+
+    <div id="friendBox" class="friend">
+      <strong>請先加入 YOKA 官方 LINE 好友</strong>
+      <div>加入好友後，訂單成立時才能收到 LINE 訂單通知。</div>
+      <button type="button" class="friend-btn" onclick="requestFriend()">加入好友</button>
+    </div>
+
+    <form id="customerForm" method="post">
+      <input type="hidden" name="action" value="submitCustomer">
+      <input type="hidden" id="fOrderNo" name="orderNo">
+      <input type="hidden" id="fToken" name="token">
+      <input type="hidden" id="fLineUserId" name="lineUserId">
+      <input type="hidden" id="fLineDisplayName" name="lineDisplayName">
+      <input type="hidden" id="fLineAccessToken" name="lineAccessToken">
+      <input type="hidden" id="fLineIdToken" name="lineIdToken">
+
+      <label>收件人姓名 <span class="req">*</span></label>
+      <input name="name" id="name" autocomplete="name" required placeholder="請輸入收件人姓名">
+
+      <label>聯絡電話 <span class="req">*</span></label>
+      <input name="phone" id="phone" inputmode="tel" autocomplete="tel" required placeholder="例如：0912345678">
+
+      <label>收件地址 <span class="req">*</span></label>
+      <input name="address" id="address" autocomplete="street-address" required placeholder="請輸入完整地址">
+      <div class="hint">請直接填寫完整地址，例如：台中市北屯區○○路100號</div>
+
+      <label>配送備註</label>
+      <textarea name="note" id="note" placeholder="例如：指定配送時間、管理室代收等"></textarea>
+
+      <div id="error" class="error"></div>
+      <button id="submitBtn" type="submit" class="submit" disabled>LINE 連結中...</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const LIFF_ID = '2009269118-FhJVRpRo';
+
+const qs = new URLSearchParams(location.search);
+const ORDER_NO = qs.get('order') || '';
+const TOKEN = qs.get('token') || '';
+const API_URL = qs.get('api') || '';
+const PRODUCT = qs.get('product') || '';
+const TOTAL = qs.get('total') || '';
+
+let LINE_USER_ID = '';
+let LINE_DISPLAY_NAME = '';
+let LINE_ACCESS_TOKEN = '';
+let LINE_ID_TOKEN = '';
+let IS_FRIEND = false;
+let LIFF_OK = false;
+
+function money(v){
+  const n = Number(v || 0);
+  return '$' + n.toLocaleString('zh-TW');
+}
+
+function setStatus(text, type=''){
+  const el = document.getElementById('lineStatus');
+  el.textContent = text;
+  el.style.color = type === 'ok' ? '#19873b' : type === 'warn' ? '#9a6700' : type === 'error' ? '#a40000' : '#777';
+}
+
+function showError(msg){
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function syncHidden(){
+  document.getElementById('fOrderNo').value = ORDER_NO;
+  document.getElementById('fToken').value = TOKEN;
+  document.getElementById('fLineUserId').value = LINE_USER_ID;
+  document.getElementById('fLineDisplayName').value = LINE_DISPLAY_NAME;
+  document.getElementById('fLineAccessToken').value = LINE_ACCESS_TOKEN;
+  document.getElementById('fLineIdToken').value = LINE_ID_TOKEN;
+}
+
+function updateSubmit(){
+  const btn = document.getElementById('submitBtn');
+  if (LIFF_OK && IS_FRIEND) {
+    btn.disabled = false;
+    btn.textContent = '確認送出收件資料';
+  } else if (LIFF_OK && !IS_FRIEND) {
+    btn.disabled = true;
+    btn.textContent = '請先加入 LINE 好友';
+  } else {
+    btn.disabled = true;
+    btn.textContent = 'LINE 連結中...';
+  }
+}
+
+async function checkFriend(){
+  try{
+    const r = await liff.getFriendship();
+    IS_FRIEND = !!(r && r.friendFlag);
+    document.getElementById('friendBox').classList.toggle('show', !IS_FRIEND);
+
+    if(IS_FRIEND){
+      setStatus(
+        LINE_DISPLAY_NAME
+          ? `LINE 已連結：${LINE_DISPLAY_NAME}｜已加入官方帳號`
+          : 'LINE 身分已連結｜已加入官方帳號',
+        'ok'
+      );
+    }else{
+      setStatus('LINE 已連結，但尚未加入 YOKA 官方帳號', 'warn');
+    }
+  }catch(err){
+    IS_FRIEND = false;
+    document.getElementById('friendBox').classList.add('show');
+    setStatus('無法確認好友狀態，請確認 LIFF 已開啟 profile 權限', 'error');
+  }
+  updateSubmit();
+  return IS_FRIEND;
+}
+
+async function requestFriend(){
+  try{
+    if(typeof liff.requestFriendship === 'function'){
+      await liff.requestFriendship();
+      await checkFriend();
+    }else{
+      alert('目前 LINE 版本不支援直接加入好友，請先加入 YOKA 官方 LINE 後再回到此頁。');
+    }
+  }catch(err){
+    alert('無法開啟加入好友視窗，請確認 LIFF 使用 Full 畫面並已連結 YOKA 官方帳號。');
+  }
+}
+
+async function initLiff(){
+  try{
+    await liff.init({
+      liffId: LIFF_ID,
+      withLoginOnExternalBrowser: true
+    });
+
+    if(!liff.isLoggedIn()){
+      setStatus('正在登入 LINE...', 'warn');
+      return;
+    }
+
+    LINE_ID_TOKEN = liff.getIDToken() || '';
+    LINE_ACCESS_TOKEN = liff.getAccessToken() || '';
+
+    const decoded = liff.getDecodedIDToken();
+    if(decoded && decoded.sub) LINE_USER_ID = decoded.sub;
+
+    try{
+      const context = liff.getContext();
+      if(!LINE_USER_ID && context && context.userId) LINE_USER_ID = context.userId;
+    }catch(e){}
+
+    try{
+      const profile = await liff.getProfile();
+      LINE_USER_ID = LINE_USER_ID || profile.userId || '';
+      LINE_DISPLAY_NAME = profile.displayName || '';
+    }catch(e){}
+
+    if(!LINE_USER_ID){
+      setStatus('LINE 已登入，但無法取得使用者身分，請確認 openid / profile 權限', 'error');
+      return;
+    }
+
+    LIFF_OK = true;
+    syncHidden();
+    await checkFriend();
+
+  }catch(err){
+    console.error(err);
+    setStatus('LINE 連結失敗，請關閉後重新由 LINE 開啟', 'error');
+  }
+}
+
+document.getElementById('customerForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  document.getElementById('error').style.display = 'none';
+
+  if(!LIFF_OK || !LINE_USER_ID){
+    showError('LINE 身分尚未完成連結，請稍候後再試。');
+    return;
+  }
+
+  const friend = await checkFriend();
+  if(!friend){
+    showError('請先加入 YOKA 官方 LINE 好友後再送出。');
+    return;
+  }
+
+  if(!this.reportValidity()) return;
+
+  syncHidden();
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '資料送出中...';
+
+  // 標準 HTML POST 到 Apps Script。
+  // 不使用 fetch，因此不受跨網域 CORS 限制。
+  this.submit();
+});
+
+(function boot(){
+  if(!ORDER_NO || !TOKEN || !API_URL){
+    document.getElementById('loading').textContent = '訂單連結不完整，請重新掃描門市提供的 QR Code。';
+    return;
+  }
+
+  document.getElementById('customerForm').action = API_URL;
+  document.getElementById('orderNo').textContent = '訂單編號：' + ORDER_NO;
+  document.getElementById('product').textContent = PRODUCT || '門市訂購商品';
+  document.getElementById('total').textContent = '訂單金額：' + money(TOTAL);
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  syncHidden();
+  initLiff();
+})();
+</script>
+</body>
+</html>
