@@ -1,615 +1,195 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8">
-  <meta
-    name="viewport"
-    content="width=device-width,initial-scale=1,viewport-fit=cover">
-
-  <title>YOKA QR 掃碼</title>
-
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      margin: 0;
-      min-height: 100%;
-      background: #111;
-      color: #fff;
-      font-family:
-        Arial,
-        "Microsoft JhengHei",
-        sans-serif;
-    }
-
-    .page {
-      min-height: 100vh;
-      padding:
-        max(18px, env(safe-area-inset-top))
-        16px
-        max(18px, env(safe-area-inset-bottom));
-      display: flex;
-      flex-direction: column;
-    }
-
-    .head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-
-    .title {
-      font-size: 22px;
-      font-weight: 900;
-    }
-
-    .close {
-      border: 0;
-      border-radius: 10px;
-      background: #fff;
-      color: #111;
-      min-width: 44px;
-      height: 44px;
-      font-size: 20px;
-      font-weight: 900;
-    }
-
-    .card {
-      background: #fff;
-      color: #111;
-      border-radius: 18px;
-      padding: 14px;
-    }
-
-    #reader {
-      width: 100%;
-      min-height: 320px;
-      overflow: hidden;
-      border-radius: 14px;
-      background: #000;
-    }
-
-    #reader video {
-      object-fit: cover !important;
-    }
-
-    .tip {
-      margin-top: 12px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: #555;
-      text-align: center;
-    }
-
-    .status {
-      margin-top: 12px;
-      padding: 12px;
-      border-radius: 10px;
-      background: #f3f4f6;
-      color: #222;
-      font-size: 14px;
-      line-height: 1.5;
-      text-align: center;
-    }
-
-    .fallback {
-      display: none;
-      margin-top: 12px;
-    }
-
-    .fallback label {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 52px;
-      border-radius: 12px;
-      background: #111;
-      color: #fff;
-      font-weight: 900;
-    }
-
-    .fallback input {
-      display: none;
-    }
-
-    .manual {
-      margin-top: 12px;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-    }
-
-    .manual input {
-      width: 100%;
-      min-height: 48px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      padding: 0 12px;
-      font-size: 16px;
-    }
-
-    .manual button {
-      min-height: 48px;
-      border: 0;
-      border-radius: 10px;
-      padding: 0 18px;
-      background: #111;
-      color: #fff;
-      font-weight: 900;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>YOKA QR 掃碼</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#111;color:#fff;font-family:Arial,"Microsoft JhengHei",sans-serif}
+.page{min-height:100vh;padding:max(16px,env(safe-area-inset-top)) 14px max(16px,env(safe-area-inset-bottom))}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.title{font-size:22px;font-weight:900}.close{width:44px;height:44px;border:0;border-radius:10px;font-size:20px}
+.card{background:#fff;color:#111;border-radius:18px;padding:14px}
+.viewport{position:relative;width:100%;aspect-ratio:3/4;background:#000;border-radius:14px;overflow:hidden}
+#video{width:100%;height:100%;object-fit:cover}
+.guide{position:absolute;left:12%;right:12%;top:25%;bottom:25%;border:3px solid #fff;border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.18);pointer-events:none}
+#reader{display:none}
+.status{margin-top:12px;padding:12px;border-radius:10px;background:#f3f4f6;line-height:1.5;text-align:center}
+.tip{margin-top:10px;font-size:14px;color:#555;line-height:1.6;text-align:center}
+.actions{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}
+.btn{min-height:50px;border:0;border-radius:12px;background:#111;color:#fff;font-size:16px;font-weight:900}
+.secondary{background:#eee;color:#111}
+.manual{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}
+.manual input{min-width:0;height:48px;border:1px solid #ccc;border-radius:10px;padding:0 12px;font-size:16px}
+.manual button{border:0;border-radius:10px;background:#111;color:#fff;padding:0 18px;font-weight:900}
+#photoInput{display:none}
+.debug{margin-top:10px;font-size:12px;color:#777;word-break:break-all}
+</style>
 </head>
-
 <body>
-
-  <div class="page">
-
-    <div class="head">
-      <div
-        id="title"
-        class="title">
-        YOKA 商品 QR 掃碼
-      </div>
-
-      <button
-        class="close"
-        type="button"
-        onclick="goBackWithoutScan()">
-        ✕
-      </button>
-    </div>
-
-    <div class="card">
-
-      <div id="reader"></div>
-
-      <div
-        id="status"
-        class="status">
-        正在啟動相機…
-      </div>
-
-      <div class="tip">
-        將單一 QR 碼放在畫面中央，建議約佔畫面寬度 30～60%。
-        掃描成功後會自動回到 YOKA 開單頁。
-      </div>
-
-      <div
-        id="fallback"
-        class="fallback">
-
-        <label for="photoInput">
-          📷 相機無法即時開啟？改用拍照辨識
-        </label>
-
-        <input
-          id="photoInput"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onchange="scanPhoto(event)">
-      </div>
-
-      <div class="manual">
-        <input
-          id="manualValue"
-          autocomplete="off"
-          placeholder="或手動輸入 QR 內容">
-
-        <button
-          type="button"
-          onclick="submitManual()">
-          確定
-        </button>
-      </div>
-
-    </div>
-
+<div class="page">
+  <div class="head">
+    <div id="title" class="title">YOKA QR 掃碼</div>
+    <button class="close" type="button" onclick="goBack()">✕</button>
   </div>
-
-
+  <div class="card">
+    <div class="viewport" id="viewport">
+      <video id="video" playsinline muted autoplay></video>
+      <div class="guide"></div>
+    </div>
+    <div id="reader"></div>
+    <div id="status" class="status">正在檢查手機相機…</div>
+    <div class="tip">將 QR 碼放入白框內。掃到後會自動回到門市開單頁。</div>
+    <div class="actions">
+      <button class="btn secondary" type="button" onclick="retryCamera()">重新開啟相機</button>
+      <label class="btn secondary" style="display:flex;align-items:center;justify-content:center" for="photoInput">拍照／選照片辨識</label>
+      <input id="photoInput" type="file" accept="image/*" capture="environment" onchange="scanPhoto(event)">
+    </div>
+    <div class="manual">
+      <input id="manualValue" autocomplete="off" placeholder="測試用：手動輸入 QR 內容">
+      <button type="button" onclick="submitManual()">確定</button>
+    </div>
+    <div id="debug" class="debug"></div>
+  </div>
+</div>
 <script>
+const P=new URLSearchParams(location.search);
+const TARGET=P.get('target')==='carrier'?'carrier':'product';
+const RETURN_URL=P.get('return')||'';
+let stream=null, detector=null, html5Scanner=null, locked=false, raf=0;
 
-const params =
-  new URLSearchParams(
-    window.location.search
-  );
+function status(t){document.getElementById('status').textContent=t}
+function debug(t){document.getElementById('debug').textContent=t||''}
 
-
-const TARGET =
-  params.get(
-    'target'
-  ) === 'carrier'
-    ? 'carrier'
-    : 'product';
-
-
-const RETURN_URL =
-  params.get(
-    'return'
-  ) || '';
-
-
-let scanner = null;
-
-let locked = false;
-
-
-function setStatus(
-  text
-) {
-
-  document
-    .getElementById(
-      'status'
-    )
-    .textContent =
-      text;
+function finish(value){
+  if(locked)return;
+  const v=String(value||'').trim();
+  if(!v)return;
+  locked=true;
+  stopCamera();
+  status('掃描成功：'+v);
+  if(!RETURN_URL){alert('掃描成功：'+v);return}
+  const back=new URL(RETURN_URL);
+  back.searchParams.set('scanTarget',TARGET);
+  back.searchParams.set('scanValue',v);
+  setTimeout(()=>location.replace(back.toString()),150);
 }
 
-
-function finishScan(
-  value
-) {
-
-  if (locked) {
-    return;
-  }
-
-
-  const scanned =
-    String(
-      value || ''
-    ).trim();
-
-
-  if (!scanned) {
-    return;
-  }
-
-
-  locked =
-    true;
-
-
-  setStatus(
-    '掃描成功：' +
-    scanned
-  );
-
-
-  if (!RETURN_URL) {
-
-    alert(
-      '掃描成功：' +
-      scanned +
-      '\n\n但缺少回傳網址。'
-    );
-
-    return;
-  }
-
-
-  const back =
-    new URL(
-      RETURN_URL
-    );
-
-
-  back.searchParams.set(
-    'scanTarget',
-    TARGET
-  );
-
-
-  back.searchParams.set(
-    'scanValue',
-    scanned
-  );
-
-
-  setTimeout(
-    () => {
-
-      window.location.replace(
-        back.toString()
-      );
-
-    },
-    250
-  );
+async function initDetector(){
+  if(!('BarcodeDetector' in globalThis))return false;
+  try{
+    const formats=await BarcodeDetector.getSupportedFormats();
+    if(!formats.includes('qr_code'))return false;
+    detector=new BarcodeDetector({formats:['qr_code']});
+    return true;
+  }catch(e){debug('BarcodeDetector: '+(e.message||e));return false}
 }
 
-
-async function startScanner() {
-
-  document
-    .getElementById(
-      'title'
-    )
-    .textContent =
-      TARGET === 'carrier'
-        ? 'YOKA 載具 QR 掃碼'
-        : 'YOKA 商品 QR 掃碼';
-
-
-  try {
-
-    if (
-      typeof Html5Qrcode ===
-      'undefined'
-    ) {
-
-      throw new Error(
-        'QR 掃碼元件載入失敗'
-      );
+async function startNativeCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)
+    throw new Error('此瀏覽器沒有提供 getUserMedia');
+  stream=await navigator.mediaDevices.getUserMedia({
+    audio:false,
+    video:{
+      facingMode:{ideal:'environment'},
+      width:{ideal:1920},
+      height:{ideal:1080}
     }
+  });
+  const video=document.getElementById('video');
+  video.srcObject=stream;
+  await video.play();
+  status('相機已開啟，請對準 QR 碼');
+  scanFrames();
+}
 
-
-    scanner =
-      new Html5Qrcode(
-        'reader'
-      );
-
-
-    const cameras =
-      await Html5Qrcode
-        .getCameras();
-
-
-    if (
-      !cameras ||
-      !cameras.length
-    ) {
-
-      throw new Error(
-        '找不到可用相機'
-      );
-    }
-
-
-    let cameraId =
-      cameras[0].id;
-
-
-    const backCamera =
-      cameras.find(
-        camera => {
-
-          const label =
-            String(
-              camera.label || ''
-            ).toLowerCase();
-
-
-          return (
-            label.includes(
-              'back'
-            ) ||
-            label.includes(
-              'rear'
-            ) ||
-            label.includes(
-              'environment'
-            ) ||
-            label.includes(
-              '後'
-            )
-          );
-        }
-      );
-
-
-    if (backCamera) {
-
-      cameraId =
-        backCamera.id;
-    }
-
-
-    await scanner.start(
-      cameraId,
-      {
-        fps:
-          12,
-
-        qrbox:
-          (
-            width,
-            height
-          ) => {
-
-            const size =
-              Math.floor(
-                Math.min(
-                  width,
-                  height
-                ) *
-                0.72
-              );
-
-
-            return {
-              width:
-                size,
-              height:
-                size
-            };
-          },
-
-        aspectRatio:
-          1
-      },
-      decodedText => {
-
-        finishScan(
-          decodedText
-        );
-      },
-      () => {
-        // 未辨識影格忽略
+async function scanFrames(){
+  if(locked||!stream||!detector)return;
+  const video=document.getElementById('video');
+  try{
+    if(video.readyState>=2){
+      const codes=await detector.detect(video);
+      if(codes&&codes.length&&codes[0].rawValue){
+        finish(codes[0].rawValue);return;
       }
-    );
-
-
-    setStatus(
-      '相機已開啟，請對準 QR 碼'
-    );
-
-
-  } catch (err) {
-
-    const message =
-      err &&
-      err.message
-        ? err.message
-        : String(
-            err || '未知錯誤'
-          );
-
-
-    setStatus(
-      '即時相機無法開啟：' +
-      message
-    );
-
-
-    document
-      .getElementById(
-        'fallback'
-      )
-      .style.display =
-        'block';
-  }
-}
-
-
-async function scanPhoto(
-  event
-) {
-
-  const input =
-    event &&
-    event.target
-      ? event.target
-      : null;
-
-
-  const file =
-    input &&
-    input.files &&
-    input.files.length
-      ? input.files[0]
-      : null;
-
-
-  if (!file) {
-    return;
-  }
-
-
-  try {
-
-    if (!scanner) {
-
-      scanner =
-        new Html5Qrcode(
-          'reader'
-        );
     }
+  }catch(e){}
+  raf=requestAnimationFrame(scanFrames);
+}
 
+async function startHtml5Camera(){
+  document.getElementById('viewport').style.display='none';
+  document.getElementById('reader').style.display='block';
+  if(typeof Html5Qrcode==='undefined')throw new Error('備援掃碼元件未載入');
+  html5Scanner=new Html5Qrcode('reader');
+  await html5Scanner.start(
+    {facingMode:'environment'},
+    {fps:10,qrbox:{width:260,height:260},aspectRatio:1},
+    txt=>finish(txt),
+    ()=>{}
+  );
+  status('備援相機已開啟，請對準 QR 碼');
+}
 
-    setStatus(
-      '正在辨識照片…'
-    );
-
-
-    const value =
-      await scanner.scanFile(
-        file,
-        true
-      );
-
-
-    finishScan(
-      value
-    );
-
-
-  } catch (err) {
-
-    setStatus(
-      '照片中未辨識到 QR，請重新拍攝。'
-    );
-
-
-    alert(
-      '照片中未辨識到 QR，請讓 QR 放大、保持正面並重新拍攝。'
-    );
-
-
-  } finally {
-
-    if (input) {
-
-      input.value =
-        '';
+async function boot(){
+  document.getElementById('title').textContent=
+    TARGET==='carrier'?'YOKA 載具 QR 掃碼':'YOKA 商品 QR 掃碼';
+  debug('HTTPS='+window.isSecureContext+'｜UA='+navigator.userAgent);
+  try{
+    const nativeOK=await initDetector();
+    if(nativeOK){
+      await startNativeCamera();
+      return;
     }
+    status('此瀏覽器不支援原生 QR API，切換相容掃碼模式…');
+    await startHtml5Camera();
+  }catch(e){
+    const msg=e&&e.message?e.message:String(e||'未知錯誤');
+    status('相機無法開啟：'+msg);
+    debug('HTTPS='+window.isSecureContext+'｜'+msg+'｜UA='+navigator.userAgent);
   }
 }
 
-
-function submitManual() {
-
-  const value =
-    document
-      .getElementById(
-        'manualValue'
-      )
-      .value
-      .trim();
-
-
-  if (!value) {
-    return;
-  }
-
-
-  finishScan(
-    value
-  );
+async function scanPhoto(ev){
+  const input=ev.target;
+  const file=input.files&&input.files[0];
+  if(!file)return;
+  status('正在辨識照片…');
+  try{
+    if('BarcodeDetector' in globalThis){
+      const formats=await BarcodeDetector.getSupportedFormats();
+      if(formats.includes('qr_code')){
+        const bitmap=await createImageBitmap(file);
+        const d=new BarcodeDetector({formats:['qr_code']});
+        const result=await d.detect(bitmap);
+        if(result&&result.length){finish(result[0].rawValue);return}
+      }
+    }
+    if(typeof Html5Qrcode==='undefined')throw new Error('沒有可用的照片辨識器');
+    if(!html5Scanner)html5Scanner=new Html5Qrcode('reader');
+    const txt=await html5Scanner.scanFile(file,true);
+    finish(txt);
+  }catch(e){
+    status('照片未辨識到 QR。請把 QR 放大後再拍。');
+    debug('Photo: '+(e.message||e));
+  }finally{input.value=''}
 }
 
-
-function goBackWithoutScan() {
-
-  if (!RETURN_URL) {
-
-    history.back();
-
-    return;
+function stopCamera(){
+  if(raf)cancelAnimationFrame(raf);
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  if(html5Scanner){
+    try{html5Scanner.stop().catch(()=>{})}catch(e){}
   }
-
-
-  window.location.replace(
-    RETURN_URL
-  );
 }
 
-
-window.addEventListener(
-  'load',
-  startScanner
-);
-
+function retryCamera(){stopCamera();locked=false;setTimeout(boot,100)}
+function submitManual(){finish(document.getElementById('manualValue').value)}
+function goBack(){stopCamera();RETURN_URL?location.replace(RETURN_URL):history.back()}
+addEventListener('pagehide',stopCamera);
+addEventListener('load',boot);
 </script>
-
 </body>
 </html>
