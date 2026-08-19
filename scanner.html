@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>YOKA QR 掃碼</title>
+<title>YOKA QR 掃碼 V13.3</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -63,18 +63,158 @@ let stream=null, detector=null, html5Scanner=null, locked=false, raf=0;
 function status(t){document.getElementById('status').textContent=t}
 function debug(t){document.getElementById('debug').textContent=t||''}
 
-function finish(value){
-  if(locked)return;
-  const v=String(value||'').trim();
-  if(!v)return;
-  locked=true;
+function finish(
+  value
+) {
+
+  if (locked) {
+    return;
+  }
+
+
+  const v =
+    String(
+      value || ''
+    ).trim();
+
+
+  if (!v) {
+    return;
+  }
+
+
+  locked =
+    true;
+
+
   stopCamera();
-  status('掃描成功：'+v);
-  if(!RETURN_URL){alert('掃描成功：'+v);return}
-  const back=new URL(RETURN_URL);
-  back.searchParams.set('scanTarget',TARGET);
-  back.searchParams.set('scanValue',v);
-  setTimeout(()=>location.replace(back.toString()),150);
+
+
+  status(
+    '掃描成功：' +
+    v +
+    '｜正在回傳門市系統…'
+  );
+
+
+  // --------------------------------------------------------
+  // V13.3 主流程：
+  // Scanner 是由門市前台用 window.open() 開啟，
+  // 直接 postMessage 回原視窗，不重新載入 Apps Script。
+  // --------------------------------------------------------
+
+  try {
+
+    if (
+      window.opener &&
+      !window.opener.closed
+    ) {
+
+      window.opener.postMessage(
+        {
+          type:
+            'YOKA_SCAN_RESULT',
+
+          target:
+            TARGET,
+
+          value:
+            v
+        },
+        '*'
+      );
+
+
+      try {
+
+        window.opener.focus();
+
+      } catch (focusErr) {
+        // iOS Safari 可忽略
+      }
+
+
+      setTimeout(
+        () => {
+
+          window.close();
+
+
+          // 若 iOS Safari 沒有允許自動關閉，
+          // 顯示明確提示，而不是白畫面。
+          setTimeout(
+            () => {
+
+              if (!window.closed) {
+
+                status(
+                  '掃描已回傳完成。請切回 YOKA 門市開單頁，此頁可直接關閉。'
+                );
+              }
+
+            },
+            400
+          );
+
+        },
+        250
+      );
+
+
+      return;
+    }
+
+  } catch (err) {
+    // opener 被瀏覽器限制時走下方備援。
+  }
+
+
+  // --------------------------------------------------------
+  // 備援流程：舊式網址回傳
+  // 只有 opener 不存在時才使用。
+  // --------------------------------------------------------
+
+  if (RETURN_URL) {
+
+    const back =
+      new URL(
+        RETURN_URL
+      );
+
+
+    back.searchParams.set(
+      'scanTarget',
+      TARGET
+    );
+
+
+    back.searchParams.set(
+      'scanValue',
+      v
+    );
+
+
+    setTimeout(
+      () => {
+
+        window.location.replace(
+          back.toString()
+        );
+
+      },
+      250
+    );
+
+
+    return;
+  }
+
+
+  status(
+    '掃描成功：' +
+    v +
+    '。請回到 YOKA 門市開單頁。'
+  );
 }
 
 async function initDetector(){
@@ -187,7 +327,44 @@ function stopCamera(){
 
 function retryCamera(){stopCamera();locked=false;setTimeout(boot,100)}
 function submitManual(){finish(document.getElementById('manualValue').value)}
-function goBack(){stopCamera();RETURN_URL?location.replace(RETURN_URL):history.back()}
+function goBack() {
+
+  stopCamera();
+
+
+  try {
+
+    if (
+      window.opener &&
+      !window.opener.closed
+    ) {
+
+      window.opener.focus();
+
+
+      window.close();
+
+
+      return;
+    }
+
+  } catch (err) {
+    // 忽略並使用下方備援
+  }
+
+
+  if (RETURN_URL) {
+
+    window.location.replace(
+      RETURN_URL
+    );
+
+    return;
+  }
+
+
+  history.back();
+}
 addEventListener('pagehide',stopCamera);
 addEventListener('load',boot);
 </script>
