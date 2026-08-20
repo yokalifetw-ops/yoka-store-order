@@ -84,7 +84,11 @@
 
       <label>收件地址 <span class="req">*</span></label>
       <input name="address" id="address" autocomplete="street-address" required placeholder="請輸入完整地址">
-      <div class="hint">請直接填寫完整地址，例如：台中市北屯區○○路100號</div>
+      <div id="addressHint" class="hint">請直接填寫完整地址，例如：台中市北屯區○○路100號</div>
+
+      <label>Email <span id="emailReq" class="req" style="display:none">*</span></label>
+      <input name="email" id="email" type="email" inputmode="email" autocomplete="email" placeholder="請輸入電子信箱">
+      <div id="emailHint" class="hint">電子發票將於 7 個工作天內發送至此信箱。</div>
 
       <label>配送備註</label>
       <textarea name="note" id="note" placeholder="例如：指定配送時間、管理室代收等"></textarea>
@@ -110,6 +114,9 @@ let LINE_ACCESS_TOKEN = '';
 let LINE_ID_TOKEN = '';
 let IS_FRIEND = false;
 let LIFF_OK = false;
+
+let IS_PICKUP = false;
+let INVOICE_TYPE = '';
 
 
 function money(v){
@@ -225,6 +232,170 @@ function readOrderParamsAfterLiffInit(){
         err
       );
     }
+  }
+}
+
+
+async function loadOrderMeta(){
+
+  try{
+
+    const url =
+      new URL(
+        API_URL
+      );
+
+    url.searchParams.set(
+      'action',
+      'getCustomerOrder'
+    );
+
+    url.searchParams.set(
+      'orderNo',
+      ORDER_NO
+    );
+
+    url.searchParams.set(
+      'token',
+      TOKEN
+    );
+
+
+    const response =
+      await fetch(
+        url.toString(),
+        {
+          method:
+            'GET',
+          redirect:
+            'follow'
+        }
+      );
+
+
+    if(
+      !response.ok
+    ){
+      return;
+    }
+
+
+    const res =
+      await response.json();
+
+
+    if(
+      !res ||
+      !res.success
+    ){
+      return;
+    }
+
+
+    IS_PICKUP =
+      Boolean(
+        res.isPickup
+      );
+
+
+    INVOICE_TYPE =
+      String(
+        res.invoiceType || ''
+      ).trim();
+
+
+    const address =
+      document.getElementById(
+        'address'
+      );
+
+    const note =
+      document.getElementById(
+        'note'
+      );
+
+    const email =
+      document.getElementById(
+        'email'
+      );
+
+    const emailReq =
+      document.getElementById(
+        'emailReq'
+      );
+
+    const addressHint =
+      document.getElementById(
+        'addressHint'
+      );
+
+
+    if(
+      IS_PICKUP
+    ){
+
+      address.value =
+        '自取';
+
+      address.readOnly =
+        true;
+
+      address.required =
+        false;
+
+
+      note.value =
+        '自取';
+
+      note.readOnly =
+        true;
+
+
+      if(
+        addressHint
+      ){
+
+        addressHint.textContent =
+          '此訂單為客自取（限當日），地址已自動帶入「自取」，無需填寫。';
+      }
+
+    }
+
+
+    const emailRequired =
+      INVOICE_TYPE ===
+      '公司（三聯）';
+
+
+    email.required =
+      emailRequired;
+
+
+    if(
+      emailReq
+    ){
+
+      emailReq.style.display =
+        emailRequired
+          ? 'inline'
+          : 'none';
+    }
+
+
+    if(
+      res.email
+    ){
+
+      email.value =
+        res.email;
+    }
+
+  }catch(err){
+
+    console.warn(
+      '訂單附加資料載入失敗',
+      err
+    );
   }
 }
 
@@ -480,6 +651,9 @@ async function initApp(){
     }
 
 
+    await loadOrderMeta();
+
+
     if(
       !liff.isLoggedIn()
     ){
@@ -638,6 +812,58 @@ document
         showError(
           '請先加入 YOKA 官方 LINE 好友後再送出。'
         );
+
+        return;
+      }
+
+
+      const email =
+        document
+          .getElementById(
+            'email'
+          )
+          .value
+          .trim();
+
+
+      if(
+        INVOICE_TYPE ===
+          '公司（三聯）'
+        &&
+        !email
+      ){
+
+        showError(
+          '三聯發票請填寫 Email，電子發票將寄送至此信箱。'
+        );
+
+        document
+          .getElementById(
+            'email'
+          )
+          .focus();
+
+        return;
+      }
+
+
+      if(
+        email
+        &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+          email
+        )
+      ){
+
+        showError(
+          '請輸入正確 Email 格式。'
+        );
+
+        document
+          .getElementById(
+            'email'
+          )
+          .focus();
 
         return;
       }
