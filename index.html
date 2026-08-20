@@ -87,8 +87,8 @@
       <div id="addressHint" class="hint">請直接填寫完整地址，例如：台中市北屯區○○路100號</div>
 
       <label>Email <span id="emailReq" class="req" style="display:none">*</span></label>
-      <input name="email" id="email" type="email" inputmode="email" autocomplete="email" placeholder="請輸入電子信箱">
-      <div id="emailHint" class="hint">電子發票將於 7 個工作天內發送至此信箱。</div>
+      <input name="email" id="email" type="text" inputmode="text" autocomplete="off" placeholder="請輸入 Email 或聯絡註記">
+      <div id="emailHint" class="hint">三聯發票此欄需填寫內容；電子發票原則上將於 7 個工作天內發送至此信箱。</div>
 
       <label>配送備註</label>
       <textarea name="note" id="note" placeholder="例如：指定配送時間、管理室代收等"></textarea>
@@ -511,18 +511,13 @@ function updateSubmit(){
     '公司（三聯）';
 
 
-  const emailValid =
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-      email
-    );
-
-
+  // 三聯發票只要求「有輸入內容」即可，
+  // 不檢查是否為有效 Email 格式。
   const emailReady =
     !triplicateEmailRequired
     ||
-    (
-      email &&
-      emailValid
+    Boolean(
+      email
     );
 
 
@@ -549,7 +544,7 @@ function updateSubmit(){
       true;
 
     btn.textContent =
-      '請先填寫三聯發票 Email';
+      '請先填寫 Email';
 
   } else if(
     LIFF_OK &&
@@ -883,28 +878,6 @@ document
 
         showError(
           '三聯發票請填寫 Email，電子發票將寄送至此信箱。'
-        );
-
-        document
-          .getElementById(
-            'email'
-          )
-          .focus();
-
-        return;
-      }
-
-
-      if(
-        email
-        &&
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-          email
-        )
-      ){
-
-        showError(
-          '請輸入正確 Email 格式。'
         );
 
         document
