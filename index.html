@@ -390,6 +390,9 @@ async function loadOrderMeta(){
         res.email;
     }
 
+
+    updateSubmit();
+
   }catch(err){
 
     console.warn(
@@ -487,15 +490,47 @@ function syncHidden(){
 
 
 function updateSubmit(){
+
   const btn =
     document.getElementById(
       'submitBtn'
     );
 
-  if (
+
+  const email =
+    String(
+      document
+        .getElementById(
+          'email'
+        )?.value || ''
+    ).trim();
+
+
+  const triplicateEmailRequired =
+    INVOICE_TYPE ===
+    '公司（三聯）';
+
+
+  const emailValid =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+      email
+    );
+
+
+  const emailReady =
+    !triplicateEmailRequired
+    ||
+    (
+      email &&
+      emailValid
+    );
+
+
+  if(
     LIFF_OK &&
-    IS_FRIEND
-  ) {
+    IS_FRIEND &&
+    emailReady
+  ){
 
     btn.disabled =
       false;
@@ -503,10 +538,23 @@ function updateSubmit(){
     btn.textContent =
       '確認送出收件資料';
 
-  } else if (
+  } else if(
+    LIFF_OK &&
+    IS_FRIEND &&
+    triplicateEmailRequired &&
+    !emailReady
+  ){
+
+    btn.disabled =
+      true;
+
+    btn.textContent =
+      '請先填寫三聯發票 Email';
+
+  } else if(
     LIFF_OK &&
     !IS_FRIEND
-  ) {
+  ){
 
     btn.disabled =
       true;
@@ -901,6 +949,16 @@ document
 
 
 // 啟動
+document
+  .getElementById(
+    'email'
+  )
+  .addEventListener(
+    'input',
+    updateSubmit
+  );
+
+
 initApp();
 </script>
 </body>
