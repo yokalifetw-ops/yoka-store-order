@@ -86,9 +86,11 @@
       <input name="address" id="address" autocomplete="street-address" required placeholder="請輸入完整地址">
       <div id="addressHint" class="hint">請直接填寫完整地址，例如：台中市北屯區○○路100號</div>
 
-      <label>Email <span id="emailReq" class="req" style="display:none">*</span></label>
-      <input name="email" id="email" type="text" inputmode="text" autocomplete="off" placeholder="請輸入 Email">
-      <div id="emailHint" class="hint">三聯發票此欄需填寫Email，電子發票將於 7 個工作天內發送至信箱。</div>
+      <div id="emailSection">
+        <label>Email <span id="emailReq" class="req" style="display:none">*</span></label>
+        <input name="email" id="email" type="text" inputmode="text" autocomplete="off" placeholder="請輸入 Email">
+        <div id="emailHint" class="hint">三聯發票此欄需填寫 Email，電子發票將於 7 個工作天內發送至信箱。</div>
+      </div>
 
       <label>配送備註</label>
       <textarea name="note" id="note" placeholder="例如：指定配送時間、管理室代收等"></textarea>
@@ -443,6 +445,11 @@ async function loadOrderMeta(){
         'emailReq'
       );
 
+    const emailSection =
+      document.getElementById(
+        'emailSection'
+      );
+
     const addressHint =
       document.getElementById(
         'addressHint'
@@ -481,13 +488,42 @@ async function loadOrderMeta(){
     }
 
 
+    const hasInvoice =
+      Boolean(
+        INVOICE_TYPE
+      );
+
+
     const emailRequired =
       INVOICE_TYPE ===
       '公司（三聯）';
 
 
+    // 不需要發票：Email 整段隱藏。
+    // 個人（二聯）：顯示但非必填。
+    // 公司（三聯）：顯示且必填。
+    if(
+      emailSection
+    ){
+
+      emailSection.style.display =
+        hasInvoice
+          ? 'block'
+          : 'none';
+    }
+
+
     email.required =
       emailRequired;
+
+
+    if(
+      !hasInvoice
+    ){
+
+      email.value =
+        '';
+    }
 
 
     if(
@@ -502,6 +538,7 @@ async function loadOrderMeta(){
 
 
     if(
+      hasInvoice &&
       res.email
     ){
 
