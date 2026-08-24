@@ -1204,19 +1204,7 @@ function showExternalCreditPayment(
 }
 
 
-function openExternalPayment(){
-
-  if(
-    !PAYMENT_URL
-  ){
-
-    showError(
-      '付款連結尚未準備完成，請稍後再試。'
-    );
-
-    return;
-  }
-
+async function openExternalPayment(){
 
   const btn =
     document.getElementById(
@@ -1228,70 +1216,170 @@ function openExternalPayment(){
     true;
 
   btn.textContent =
-    '正在開啟付款頁...';
+    '正在建立安全付款...';
 
 
   try{
 
-    if(
-      window.liff &&
-      typeof liff.openWindow ===
-        'function'
-    ){
-
-      liff.openWindow({
-        url:
-          PAYMENT_URL,
-        external:
-          true
-      });
-
-
-      setTimeout(
-        function(){
-
-          btn.disabled =
-            false;
-
-          btn.textContent =
-            '再次開啟安全付款';
-        },
-        1200
+    const url =
+      new URL(
+        API_URL
       );
 
 
-      return;
+    url.searchParams.set(
+      'action',
+      'getNewebpayFormData'
+    );
+
+    url.searchParams.set(
+      'orderNo',
+      ORDER_NO
+    );
+
+    url.searchParams.set(
+      'token',
+      TOKEN
+    );
+
+
+    const response =
+      await fetch(
+        url.toString(),
+        {
+          method:
+            'GET',
+          cache:
+            'no-store'
+        }
+      );
+
+
+    if(
+      !response.ok
+    ){
+      throw new Error(
+        '付款資料讀取失敗'
+      );
     }
+
+
+    const data =
+      await response.json();
+
+
+    if(
+      !data ||
+      !data.success
+    ){
+
+      throw new Error(
+        (
+          data &&
+          data.message
+        )
+          ? data.message
+          : '無法建立付款資料'
+      );
+    }
+
+
+    const form =
+      document.createElement(
+        'form'
+      );
+
+
+    form.method =
+      'POST';
+
+    form.action =
+      data.gatewayUrl;
+
+    form.style.display =
+      'none';
+
+
+    [
+      'MerchantID',
+      'TradeInfo',
+      'TradeSha',
+      'Version'
+    ].forEach(
+      function(name){
+
+        const input =
+          document.createElement(
+            'input'
+          );
+
+
+        input.type =
+          'hidden';
+
+        input.name =
+          name;
+
+        input.value =
+          String(
+            data[name] || ''
+          );
+
+
+        form.appendChild(
+          input
+        );
+      }
+    );
+
+
+    document.body.appendChild(
+      form
+    );
+
+
+    btn.textContent =
+      '正在前往藍新付款...';
+
+
+    // 標準前景 HTML Form POST：
+    // 由目前頂層 GitHub 頁面直接提交到藍新 MPG。
+    form.submit();
+
 
   }catch(err){
 
-    console.warn(
-      'LIFF 外部瀏覽器開啟失敗',
+    console.error(
       err
     );
+
+
+    btn.disabled =
+      false;
+
+    btn.textContent =
+      '前往安全付款';
+
+
+    const box =
+      document.getElementById(
+        'errorBox'
+      );
+
+
+    if(box){
+
+      box.style.display =
+        'block';
+
+      box.textContent =
+        err &&
+        err.message
+          ? err.message
+          : '付款頁建立失敗，請稍後再試。';
+    }
   }
-
-
-  // 非 LIFF / 不支援時的備援。
-  window.open(
-    PAYMENT_URL,
-    '_blank'
-  );
-
-
-  setTimeout(
-    function(){
-
-      btn.disabled =
-        false;
-
-      btn.textContent =
-        '再次開啟安全付款';
-    },
-    1200
-  );
 }
-
 
 async function waitForPaymentRedirect(){
 
@@ -1369,7 +1457,7 @@ async function waitForPaymentRedirect(){
               '付款連結已準備完成';
 
             showExternalCreditPayment(
-              res.paymentUrl
+              ''
             );
 
             return;
