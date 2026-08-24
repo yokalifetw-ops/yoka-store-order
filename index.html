@@ -379,6 +379,38 @@ async function loadOrderMeta(){
     }
 
 
+    // V15A2：訂單金額與商品資訊一律以後端訂單資料為準，
+    // 不再以 QR query string 的 total / product 當最終值。
+    TOTAL =
+      res.total !== undefined &&
+      res.total !== null
+        ? String(res.total)
+        : TOTAL;
+
+    PRODUCT =
+      String(
+        res.productName || PRODUCT || ''
+      );
+
+    document
+      .getElementById(
+        'product'
+      )
+      .textContent =
+        PRODUCT ||
+        '門市訂購商品';
+
+    document
+      .getElementById(
+        'total'
+      )
+      .textContent =
+        '訂單金額：' +
+        money(
+          TOTAL
+        );
+
+
     IS_PICKUP =
       Boolean(
         res.isPickup
