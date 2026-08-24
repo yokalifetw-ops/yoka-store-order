@@ -211,9 +211,78 @@ let INVOICE_TYPE = '';
 let PAYMENT_METHOD = '';
 
 
+function parseMoney(v){
+
+  if(
+    typeof v === 'number'
+  ){
+
+    return Number.isFinite(v)
+      ? v
+      : NaN;
+  }
+
+
+  const cleaned =
+    String(
+      v ?? ''
+    )
+      .replace(
+        /NT\$/gi,
+        ''
+      )
+      .replace(
+        /\$/g,
+        ''
+      )
+      .replace(
+        /,/g,
+        ''
+      )
+      .replace(
+        /\s+/g,
+        ''
+      )
+      .trim();
+
+
+  if(!cleaned){
+    return NaN;
+  }
+
+
+  const n =
+    Number(
+      cleaned
+    );
+
+
+  return Number.isFinite(n)
+    ? n
+    : NaN;
+}
+
+
 function money(v){
-  const n = Number(v || 0);
-  return '$' + n.toLocaleString('zh-TW');
+
+  const n =
+    parseMoney(
+      v
+    );
+
+
+  if(
+    !Number.isFinite(n)
+  ){
+
+    return '金額讀取失敗';
+  }
+
+
+  return '$' +
+    n.toLocaleString(
+      'zh-TW'
+    );
 }
 
 
@@ -401,11 +470,29 @@ async function loadOrderMeta(){
 
     // V15A2：訂單金額與商品資訊一律以後端訂單資料為準，
     // 不再以 QR query string 的 total / product 當最終值。
-    TOTAL =
+    if(
       res.total !== undefined &&
       res.total !== null
-        ? String(res.total)
-        : TOTAL;
+    ){
+
+      const parsedTotal =
+        parseMoney(
+          res.total
+        );
+
+
+      if(
+        Number.isFinite(
+          parsedTotal
+        )
+      ){
+
+        TOTAL =
+          String(
+            parsedTotal
+          );
+      }
+    }
 
     PRODUCT =
       String(
@@ -420,15 +507,23 @@ async function loadOrderMeta(){
         PRODUCT ||
         '門市訂購商品';
 
+    const backendMoney =
+      money(
+        TOTAL
+      );
+
+
     document
       .getElementById(
         'total'
       )
       .textContent =
-        '訂單金額：' +
-        money(
-          TOTAL
-        );
+        backendMoney === '金額讀取失敗'
+          ? '訂單金額：讀取失敗'
+          : (
+              '訂單金額：' +
+              backendMoney
+            );
 
 
     IS_PICKUP =
@@ -627,15 +722,23 @@ function renderOrder(){
       '門市訂購商品';
 
 
+  const initialMoney =
+    money(
+      TOTAL
+    );
+
+
   document
     .getElementById(
       'total'
     )
     .textContent =
-      '訂單金額：' +
-      money(
-        TOTAL
-      );
+      initialMoney === '金額讀取失敗'
+        ? '訂單金額：讀取中...'
+        : (
+            '訂單金額：' +
+            initialMoney
+          );
 
 
   document
