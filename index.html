@@ -34,6 +34,13 @@
     .submit{background:#222;color:#fff;margin-top:24px}
     .submit:disabled{opacity:.45}
     .error{display:none;margin-top:14px;background:#fff0f0;color:#a40000;border-radius:12px;padding:12px 14px;line-height:1.5}
+    .payment-next{display:none;background:#fff;border-radius:20px;padding:26px 18px;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.05)}
+    .payment-next h2{margin:0 0 10px;font-size:25px}
+    .payment-next .payment-order{font-size:17px;font-weight:800;margin:10px 0}
+    .payment-next .payment-amount{font-size:24px;font-weight:900;margin:12px 0}
+    .payment-next .payment-hint{font-size:14px;color:#666;line-height:1.7;margin:12px 0 18px}
+    .payment-open{background:#222;color:#fff}
+    .payment-backup{font-size:13px;color:#888;margin-top:12px;line-height:1.5}
     .loading{padding:70px 20px;text-align:center;color:#777}
     @media(max-width:480px){
       .page{padding:20px 12px 55px}
@@ -99,6 +106,22 @@
       <div id="error" class="error"></div>
       <button id="submitBtn" type="submit" class="submit" disabled>LINE 連結中...</button>
     </form>
+  </div>
+
+  <div id="paymentNext" class="payment-next">
+    <h2>訂單資料已完成</h2>
+    <div id="paymentOrderNo" class="payment-order"></div>
+    <div id="paymentAmount" class="payment-amount"></div>
+    <div class="payment-hint">
+      為確保信用卡、Apple Pay、Google Pay、Samsung Pay 付款流程正常，
+      請使用外部瀏覽器開啟藍新安全付款頁。
+    </div>
+    <button id="openPaymentBtn" type="button" class="payment-open" onclick="openExternalPayment()">
+      前往安全付款
+    </button>
+    <div class="payment-backup">
+      付款連結也會同步傳送至 LINE，若中途關閉頁面可由 LINE 再次開啟。
+    </div>
   </div>
 </div>
 
@@ -209,6 +232,7 @@ let LIFF_OK = false;
 let IS_PICKUP = false;
 let INVOICE_TYPE = '';
 let PAYMENT_METHOD = '';
+let PAYMENT_URL = '';
 
 
 function parseMoney(v){
@@ -1124,6 +1148,151 @@ function isNewMultiStoreOnlinePayment(){
 }
 
 
+
+function showExternalCreditPayment(
+  paymentUrl
+){
+
+  PAYMENT_URL =
+    String(
+      paymentUrl || ''
+    );
+
+
+  document
+    .getElementById(
+      'app'
+    )
+    .style.display =
+      'none';
+
+
+  const panel =
+    document.getElementById(
+      'paymentNext'
+    );
+
+
+  panel.style.display =
+    'block';
+
+
+  document
+    .getElementById(
+      'paymentOrderNo'
+    )
+    .textContent =
+      '訂單編號：' +
+      ORDER_NO;
+
+
+  document
+    .getElementById(
+      'paymentAmount'
+    )
+    .textContent =
+      '訂單金額：' +
+      money(
+        TOTAL
+      );
+
+
+  window.scrollTo(
+    0,
+    0
+  );
+}
+
+
+function openExternalPayment(){
+
+  if(
+    !PAYMENT_URL
+  ){
+
+    showError(
+      '付款連結尚未準備完成，請稍後再試。'
+    );
+
+    return;
+  }
+
+
+  const btn =
+    document.getElementById(
+      'openPaymentBtn'
+    );
+
+
+  btn.disabled =
+    true;
+
+  btn.textContent =
+    '正在開啟付款頁...';
+
+
+  try{
+
+    if(
+      window.liff &&
+      typeof liff.openWindow ===
+        'function'
+    ){
+
+      liff.openWindow({
+        url:
+          PAYMENT_URL,
+        external:
+          true
+      });
+
+
+      setTimeout(
+        function(){
+
+          btn.disabled =
+            false;
+
+          btn.textContent =
+            '再次開啟安全付款';
+        },
+        1200
+      );
+
+
+      return;
+    }
+
+  }catch(err){
+
+    console.warn(
+      'LIFF 外部瀏覽器開啟失敗',
+      err
+    );
+  }
+
+
+  // 非 LIFF / 不支援時的備援。
+  window.open(
+    PAYMENT_URL,
+    '_blank'
+  );
+
+
+  setTimeout(
+    function(){
+
+      btn.disabled =
+        false;
+
+      btn.textContent =
+        '再次開啟安全付款';
+    },
+    1200
+  );
+}
+
+
 async function waitForPaymentRedirect(){
 
   const btn =
@@ -1191,6 +1360,23 @@ async function waitForPaymentRedirect(){
           res.paymentUrl
         ){
 
+          if(
+            PAYMENT_METHOD ===
+            '信用卡'
+          ){
+
+            btn.textContent =
+              '付款連結已準備完成';
+
+            showExternalCreditPayment(
+              res.paymentUrl
+            );
+
+            return;
+          }
+
+
+          // LINE Pay 維持原本已測通的直接付款流程。
           btn.textContent =
             '正在前往付款...';
 
