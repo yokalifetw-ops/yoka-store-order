@@ -196,6 +196,7 @@ let TOKEN = '';
 let API_URL = '';
 let PRODUCT = '';
 let TOTAL = '';
+let STORE_CODE = '';
 
 let LINE_USER_ID = '';
 let LINE_DISPLAY_NAME = '';
@@ -206,6 +207,7 @@ let LIFF_OK = false;
 
 let IS_PICKUP = false;
 let INVOICE_TYPE = '';
+let PAYMENT_METHOD = '';
 
 
 function money(v){
@@ -260,6 +262,13 @@ function readOrderParamsAfterLiffInit(){
   TOTAL =
     qs.get('total') || '';
 
+  STORE_CODE =
+    String(
+      qs.get('store') || ''
+    )
+      .trim()
+      .toUpperCase();
+
 
   // 防呆：若某些環境仍殘留 liff.state，僅讀取、不修改它。
   if (
@@ -313,6 +322,14 @@ function readOrderParamsAfterLiffInit(){
         TOTAL ||
         sp.get('total') ||
         '';
+
+      STORE_CODE =
+        STORE_CODE ||
+        String(
+          sp.get('store') || ''
+        )
+          .trim()
+          .toUpperCase();
 
     } catch (err) {
 
@@ -422,6 +439,11 @@ async function loadOrderMeta(){
     INVOICE_TYPE =
       String(
         res.invoiceType || ''
+      ).trim();
+
+    PAYMENT_METHOD =
+      String(
+        res.paymentMethod || ''
       ).trim();
 
 
@@ -686,8 +708,21 @@ function updateSubmit(){
     btn.disabled =
       false;
 
+    const isNewMultiStore =
+      STORE_CODE === 'TP' ||
+      STORE_CODE === 'HC';
+
+    const needsOnlinePayment =
+      PAYMENT_METHOD === '信用卡' ||
+      PAYMENT_METHOD === 'LINE Pay';
+
     btn.textContent =
-      '確認送出收件資料';
+      (
+        isNewMultiStore &&
+        needsOnlinePayment
+      )
+        ? '下一步｜付款'
+        : '確認送出收件資料';
 
   } else if(
     LIFF_OK &&
