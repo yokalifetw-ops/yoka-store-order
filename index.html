@@ -100,7 +100,94 @@
 </div>
 
 <script>
-const LIFF_ID = '2009269118-FhJVRpRo';
+const LIFF_ID_TAICHUNG = '2009269118-FhJVRpRo';
+const LIFF_ID_MULTISTORE = '2009269118-w3n2Pk8L';
+
+function getRawParamsBeforeLiffInit(){
+
+  const qs =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  let params =
+    new URLSearchParams(
+      qs.toString()
+    );
+
+  const state =
+    qs.get('liff.state') || '';
+
+  if(state){
+
+    try{
+
+      const decoded =
+        decodeURIComponent(
+          state
+        );
+
+      const queryPart =
+        decoded.includes('?')
+          ? decoded.substring(
+              decoded.indexOf('?') + 1
+            )
+          : decoded.replace(
+              /^\/+/, ''
+            );
+
+      const stateParams =
+        new URLSearchParams(
+          queryPart
+        );
+
+      stateParams.forEach(
+        (value, key) => {
+          if(!params.get(key)){
+            params.set(
+              key,
+              value
+            );
+          }
+        }
+      );
+
+    }catch(err){
+
+      console.warn(
+        'LIFF 預解析失敗',
+        err
+      );
+    }
+  }
+
+  return params;
+}
+
+
+function resolveLiffIdBeforeInit(){
+
+  const params =
+    getRawParamsBeforeLiffInit();
+
+  const store =
+    String(
+      params.get('store') || ''
+    )
+      .trim()
+      .toUpperCase();
+
+  // 台北、新竹與未來共用多門市系統使用新 LIFF。
+  // 台中舊系統若沒有 store 或 store=TC，維持原 LIFF，避免影響現行系統。
+  if(
+    store &&
+    store !== 'TC'
+  ){
+    return LIFF_ID_MULTISTORE;
+  }
+
+  return LIFF_ID_TAICHUNG;
+}
 
 let ORDER_NO = '';
 let TOKEN = '';
@@ -676,7 +763,7 @@ async function initApp(){
     // 不可在這之前讀 order/token/api。
     await liff.init({
       liffId:
-        LIFF_ID,
+        resolveLiffIdBeforeInit(),
       withLoginOnExternalBrowser:
         true
     });
