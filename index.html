@@ -18,6 +18,7 @@
     .order-no{font-size:22px;font-weight:900}
     .product{font-size:17px;color:#555;margin-top:12px;line-height:1.55}
     .total{font-size:24px;font-weight:900;margin-top:14px}
+    .payment-method{margin-top:14px;padding:12px 14px;border-radius:12px;background:#eef6ff;color:#174a7e;font-size:15px;font-weight:800;line-height:1.55}
     .line-status{font-size:15px;font-weight:700;margin:0 0 16px;color:#777}
     .friend{display:none;background:#fff7df;border:1px solid #ead58d;border-radius:14px;padding:16px;margin-bottom:18px;color:#6f5200;line-height:1.55}
     .friend.show{display:block}
@@ -64,6 +65,7 @@
       <div id="orderNo" class="order-no"></div>
       <div id="product" class="product"></div>
       <div id="total" class="total"></div>
+      <div id="paymentMethodBox" class="payment-method" style="display:none"></div>
     </div>
 
     <div id="lineStatus" class="line-status">LINE 身分連結中...</div>
@@ -436,6 +438,21 @@ function readOrderParamsAfterLiffInit(){
 }
 
 
+function getPaymentMethodHint(method){
+  const value=String(method||'').trim();
+  const map={
+    '現金':'付款方式：現金｜請於現場完成付款。',
+    '信用卡':'付款方式：信用卡／行動支付｜資料送出後請繼續完成線上付款。',
+    '匯款':'付款方式：銀行匯款｜訂單成立後 LINE 將發送匯款帳號與後五碼回報按鈕。',
+    'LINE Pay':'付款方式：LINE Pay｜資料送出後請繼續完成 LINE Pay 付款。',
+    '貨到付款':'付款方式：貨到付款｜商品配送／到貨時再支付款項。'
+  };
+  return map[value]||(value?'付款方式：'+value:'');
+}
+function renderPaymentMethodHint(){
+  const box=document.getElementById('paymentMethodBox'); if(!box) return; const text=getPaymentMethodHint(PAYMENT_METHOD); box.textContent=text; box.style.display=text?'block':'none';
+}
+
 async function loadOrderMeta(){
 
   try{
@@ -565,6 +582,9 @@ async function loadOrderMeta(){
       String(
         res.paymentMethod || ''
       ).trim();
+
+
+    renderPaymentMethodHint();
 
 
     const address =
