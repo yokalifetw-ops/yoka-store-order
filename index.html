@@ -67,6 +67,7 @@
       <button type="button" class="friend-btn" onclick="requestFriend()">加入好友</button>
     </div>
 
+    <iframe id="submitFrame" name="submitFrame" style="display:none"></iframe>
     <form id="customerForm" method="post">
       <input type="hidden" name="action" value="submitCustomer">
       <input type="hidden" id="fOrderNo" name="orderNo">
@@ -1003,6 +1004,143 @@ async function initApp(){
 }
 
 
+
+function isNewMultiStoreOnlinePayment(){
+
+  return (
+    (
+      STORE_CODE === 'TP' ||
+      STORE_CODE === 'HC'
+    )
+    &&
+    (
+      PAYMENT_METHOD === '信用卡' ||
+      PAYMENT_METHOD === 'LINE Pay'
+    )
+  );
+}
+
+
+async function waitForPaymentRedirect(){
+
+  const btn =
+    document.getElementById(
+      'submitBtn'
+    );
+
+
+  for(
+    let attempt = 0;
+    attempt < 40;
+    attempt++
+  ){
+
+    try{
+
+      const url =
+        new URL(
+          API_URL
+        );
+
+
+      url.searchParams.set(
+        'action',
+        'getCustomerPaymentRedirect'
+      );
+
+      url.searchParams.set(
+        'orderNo',
+        ORDER_NO
+      );
+
+      url.searchParams.set(
+        'token',
+        TOKEN
+      );
+
+
+      const response =
+        await fetch(
+          url.toString(),
+          {
+            method:
+              'GET',
+            redirect:
+              'follow',
+            cache:
+              'no-store'
+          }
+        );
+
+
+      if(
+        response.ok
+      ){
+
+        const res =
+          await response.json();
+
+
+        if(
+          res &&
+          res.success &&
+          res.ready &&
+          res.paymentUrl
+        ){
+
+          btn.textContent =
+            '正在前往付款...';
+
+          window.location.href =
+            res.paymentUrl;
+
+          return;
+        }
+
+
+        if(
+          res &&
+          res.success &&
+          res.ready &&
+          !res.paymentUrl
+        ){
+
+          window.location.reload();
+          return;
+        }
+      }
+
+    }catch(err){
+
+      console.warn(
+        '等待付款網址失敗',
+        err
+      );
+    }
+
+
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          500
+        )
+    );
+  }
+
+
+  showError(
+    '訂單已送出，但付款頁暫時無法開啟。請回到 LINE 使用付款連結，或稍後再試。'
+  );
+
+  btn.disabled =
+    false;
+
+  btn.textContent =
+    '下一步｜付款';
+}
+
+
 document
   .getElementById(
     'customerForm'
@@ -1105,8 +1243,32 @@ document
         '資料送出中...';
 
 
-      // 標準 HTML POST 到 Apps Script，
-      // 不受 CORS 限制。
+      // 台北／新竹的信用卡與 LINE Pay：
+      // POST 到隱藏 iframe，讓 GitHub 頂層頁面保留控制權，
+      // 後端完成後由 GitHub 自己跳轉付款頁。
+      if(
+        isNewMultiStoreOnlinePayment()
+      ){
+
+        this.target =
+          'submitFrame';
+
+        this.submit();
+
+        btn.textContent =
+          '訂單建立中...';
+
+        waitForPaymentRedirect();
+
+        return;
+      }
+
+
+      // 台中舊系統與非線上付款維持原本流程。
+      this.removeAttribute(
+        'target'
+      );
+
       this.submit();
     }
   );
