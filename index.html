@@ -103,6 +103,7 @@
     </div>
 
     <iframe id="submitFrame" name="submitFrame" style="display:none"></iframe>
+    <iframe id="followupFrame" name="followupFrame" style="display:none"></iframe>
     <form id="customerForm" method="post">
       <input type="hidden" name="action" value="submitCustomer">
       <input type="hidden" id="fOrderNo" name="orderNo">
@@ -1193,25 +1194,12 @@ function isNewMultiStoreOnlinePayment(){
 
   return (
     (
-      (
-        STORE_CODE === 'TP' ||
-        STORE_CODE === 'HC'
-      )
-      &&
-      (
-        PAYMENT_METHOD === '信用卡' ||
-        PAYMENT_METHOD === 'LINE Pay'
-      )
+      STORE_CODE === 'TP' ||
+      STORE_CODE === 'HC'
     )
-    ||
-    (
-      (
-        !STORE_CODE ||
-        STORE_CODE === 'TC'
-      )
-      &&
-      PAYMENT_METHOD === 'LINE Pay'
-    )
+    &&
+    PAYMENT_METHOD ===
+      '信用卡'
   );
 }
 
@@ -1812,168 +1800,193 @@ async function waitForCustomerSubmitComplete(){
 }
 
 
-async function submitLinePayDirect(
-  form,
-  btn
-){
-
-  const params =
-    new URLSearchParams(
-      new FormData(
-        form
-      )
-    );
+let LINEPAY_FAST_PENDING = false;
 
 
-  params.set(
-    'action',
-    'submitCustomerLinePayFast'
-  );
-
-
-  btn.disabled =
-    true;
-
-  btn.textContent =
-    '正在連接 LINE Pay...';
-
+function fireLinePayFollowup(){
 
   try{
 
-    const response =
-      await fetch(
-        API_URL,
-        {
-          method:
-            'POST',
-          body:
-            params,
-          redirect:
-            'follow',
-          cache:
-            'no-store'
-        }
+    const form =
+      document.createElement(
+        'form'
       );
 
 
-    if(
-      !response.ok
-    ){
+    form.method =
+      'POST';
 
-      throw new Error(
-        'LINE Pay 付款資料建立失敗'
-      );
-    }
-
-
-    const result =
-      await response.json();
-
-
-    if(
-      !result ||
-      !result.success ||
-      !result.paymentUrl
-    ){
-
-      throw new Error(
-        (
-          result &&
-          result.message
-        )
-          ? result.message
-          : '沒有取得 LINE Pay 付款網址'
-      );
-    }
-
-
-    // 客戶已經取得 paymentUrl。
-    // 後續 LINE 訂單通知、付款連結通知與報表更新採 keepalive 背景執行，
-    // 不再卡住付款畫面。
-    try{
-
-      const followup =
-        new URLSearchParams();
-
-      followup.set(
-        'action',
-        'linePayFollowup'
-      );
-
-      followup.set(
-        'orderNo',
-        ORDER_NO
-      );
-
-      followup.set(
-        'token',
-        TOKEN
-      );
-
-
-      fetch(
-        API_URL,
-        {
-          method:
-            'POST',
-          body:
-            followup,
-          redirect:
-            'follow',
-          keepalive:
-            true,
-          cache:
-            'no-store'
-        }
-      ).catch(
-        function(){}
-      );
-
-    }catch(e){}
-
-
-    btn.textContent =
-      '正在前往 LINE Pay...';
-
-
-    window.location.replace(
-      result.paymentUrl
-    );
-
-
-  }catch(err){
-
-    console.error(
-      'LINE Pay 直接付款失敗',
-      err
-    );
-
-
-    // 防呆 fallback：
-    // 若手機瀏覽器對跨站 POST fetch 有限制，就回到上一版背景 iframe + 輪詢，
-    // 不會讓客戶整筆訂單卡死。
-    btn.textContent =
-      '正在重新連接付款...';
-
+    form.action =
+      API_URL;
 
     form.target =
-      'submitFrame';
+      'followupFrame';
+
+    form.style.display =
+      'none';
 
 
-    form
-      .querySelector(
-        'input[name="action"]'
-      )
-      .value =
-        'submitCustomer';
+    const fields = {
+      action:
+        'linePayFollowup',
+      orderNo:
+        ORDER_NO,
+      token:
+        TOKEN
+    };
+
+
+    Object.keys(
+      fields
+    ).forEach(
+      key => {
+
+        const input =
+          document.createElement(
+            'input'
+          );
+
+
+        input.type =
+          'hidden';
+
+        input.name =
+          key;
+
+        input.value =
+          fields[
+            key
+          ];
+
+
+        form.appendChild(
+          input
+        );
+      }
+    );
+
+
+    document.body.appendChild(
+      form
+    );
 
 
     form.submit();
 
 
-    waitForPaymentRedirect();
+    setTimeout(
+      function(){
+
+        try{
+          form.remove();
+        }catch(e){}
+      },
+      1000
+    );
+
+  }catch(e){
+
+    console.warn(
+      'LINE Pay follow-up 啟動失敗',
+      e
+    );
   }
 }
+
+
+window.addEventListener(
+  'message',
+  function(event){
+
+    const data =
+      event &&
+      event.data
+        ? event.data
+        : null;
+
+
+    if(
+      !data ||
+      data.type !==
+        'YOKA_LINEPAY_READY'
+    ){
+      return;
+    }
+
+
+    if(
+      !LINEPAY_FAST_PENDING
+    ){
+      return;
+    }
+
+
+    if(
+      String(
+        data.orderNo || ''
+      ) !==
+      String(
+        ORDER_NO || ''
+      )
+    ){
+      return;
+    }
+
+
+    LINEPAY_FAST_PENDING =
+      false;
+
+
+    const btn =
+      document.getElementById(
+        'submitBtn'
+      );
+
+
+    if(
+      data.success &&
+      data.paymentUrl
+    ){
+
+      btn.textContent =
+        '正在前往 LINE Pay...';
+
+
+      // 先啟動後續通知／報表 POST。
+      // 它在獨立 iframe 執行，不阻塞付款跳轉。
+      fireLinePayFollowup();
+
+
+      // 給瀏覽器極短時間把 follow-up request 送出去，
+      // 不再等待它完成。
+      setTimeout(
+        function(){
+
+          window.location.replace(
+            data.paymentUrl
+          );
+        },
+        120
+      );
+
+
+      return;
+    }
+
+
+    btn.disabled =
+      false;
+
+    btn.textContent =
+      '下一步｜LINE Pay付款';
+
+
+    showError(
+      data.message ||
+      'LINE Pay 付款網址建立失敗，請再試一次。'
+    );
+  }
+);
 
 
 document
@@ -2081,23 +2094,68 @@ document
           : '資料送出中...';
 
 
-      // LINE Pay 全門市改走「直接 API 回傳 paymentUrl」。
-      // 不再寫 Sheet 後輪詢，成功後立即跳付款頁。
+      // LINE Pay：使用隱藏 iframe POST。
+      // Apps Script 建好 paymentUrl 後用 postMessage 直接回傳，
+      // 不用 CORS fetch，也不用輪詢試算表。
       if(
         PAYMENT_METHOD ===
           'LINE Pay'
       ){
 
-        submitLinePayDirect(
-          this,
-          btn
+        LINEPAY_FAST_PENDING =
+          true;
+
+
+        this.target =
+          'submitFrame';
+
+
+        this
+          .querySelector(
+            'input[name="action"]'
+          )
+          .value =
+            'submitCustomerLinePayFast';
+
+
+        btn.textContent =
+          '正在建立 LINE Pay 付款...';
+
+
+        this.submit();
+
+
+        // 15 秒防呆；正常應遠快於此。
+        setTimeout(
+          function(){
+
+            if(
+              LINEPAY_FAST_PENDING
+            ){
+
+              LINEPAY_FAST_PENDING =
+                false;
+
+              btn.disabled =
+                false;
+
+              btn.textContent =
+                '下一步｜LINE Pay付款';
+
+              showError(
+                'LINE Pay 連線逾時，請再試一次。'
+              );
+            }
+          },
+          15000
         );
+
 
         return;
       }
 
 
-      // 台北／新竹信用卡仍維持既有背景送單＋付款網址流程。
+      // 台北／新竹信用卡維持既有背景送單＋付款網址流程。
       if(
         isNewMultiStoreOnlinePayment()
       ){
