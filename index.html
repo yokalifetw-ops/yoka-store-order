@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- V18.32 FINAL：修正 V18.31 的 API_BASE 未定義；TC LINE Pay 完整採台北/新竹 iframe + API_URL polling + 頂層直接轉址 -->
+
 <!-- ============================================================
 V18.31 FINAL — 台中 LINE Pay 前端付款交接同步台北／新竹
 TC LINE Pay：hidden iframe POST → GitHub polling → window.location.href paymentUrl
@@ -142,6 +144,7 @@ TC LINE Pay：hidden iframe POST → GitHub polling → window.location.href pay
 
       <div id="error" class="error"></div>
       <button id="submitBtn" type="submit" class="submit" disabled>LINE 連結中...</button>
+<div id="payProgress" style="display:none;margin-top:12px;font-size:16px;font-weight:700;text-align:center;color:#555;line-height:1.6"></div>
     </form>
   </div>
 
@@ -1464,6 +1467,17 @@ async function waitForPaymentRedirect(){
     );
 
 
+  const progress =
+    document.getElementById(
+      'payProgress'
+    );
+
+  if (progress) {
+    progress.style.display = 'block';
+    progress.textContent = '正在建立 LINE Pay 付款頁，請稍候…';
+  }
+
+
   const startedAt =
     Date.now();
 
@@ -1479,7 +1493,7 @@ async function waitForPaymentRedirect(){
 
       const url =
         new URL(
-          API_BASE
+          API_URL
         );
 
 
@@ -1542,6 +1556,10 @@ async function waitForPaymentRedirect(){
           btn.textContent =
             '正在前往 LINE Pay 付款...';
 
+          if (progress) {
+            progress.textContent = '付款頁已準備完成，正在開啟 LINE Pay…';
+          }
+
 
           // 完全採台北／新竹已正常運作方式：
           // 由 GitHub 頂層頁直接轉址到 LINE Pay。
@@ -1586,16 +1604,20 @@ async function waitForPaymentRedirect(){
     }
 
 
-    // 250ms 輪詢，比原本 500ms 更快，但不會造成過多請求。
+    // 與台北／新竹相同，每 500ms 讀取一次付款網址。
     await new Promise(
       resolve =>
         setTimeout(
           resolve,
-          250
+          500
         )
     );
   }
 
+
+  if (progress) {
+    progress.style.display = 'none';
+  }
 
   showError(
     'LINE Pay 付款頁準備逾時。訂單已成立，請直接使用 LINE 收到的付款連結，或重新開啟此訂單。'
