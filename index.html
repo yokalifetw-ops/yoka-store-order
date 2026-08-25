@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- V18.27 FINAL STABLE：台中 LINE Pay 使用頂層 POST + Apps Script 直接轉址 -->
+
 <!-- V18.26：回復台中原本付款提示與「下一步｜LINE Pay付款」介面 -->
 <html lang="zh-Hant">
 <head>
@@ -1192,25 +1194,18 @@ async function initApp(){
 
 function isNewMultiStoreOnlinePayment(){
 
+  // 台北／新竹維持隱藏 iframe + payment redirect polling。
+  // 台中 LINE Pay 不走這條路：
+  // 台中直接前景 POST 到 Apps Script，
+  // Apps Script 建立 paymentUrl 後回傳付款轉址頁，直接進 LINE Pay。
   return (
     (
-      (
-        STORE_CODE === 'TP' ||
-        STORE_CODE === 'HC'
-      )
-      &&
-      (
-        PAYMENT_METHOD === '信用卡' ||
-        PAYMENT_METHOD === 'LINE Pay'
-      )
+      STORE_CODE === 'TP' ||
+      STORE_CODE === 'HC'
     )
-    ||
+    &&
     (
-      (
-        !STORE_CODE ||
-        STORE_CODE === 'TC'
-      )
-      &&
+      PAYMENT_METHOD === '信用卡' ||
       PAYMENT_METHOD === 'LINE Pay'
     )
   );
@@ -1716,7 +1711,9 @@ document
       }
 
 
-      // 其餘非線上付款維持一般送出流程。
+      // 台中 LINE Pay 與其餘非多門市付款：
+      // 直接由頂層頁面 POST，後端成功頁會直接導向 LINE Pay。
+      // 不輪詢、不受跨網域 fetch 影響。
       this.removeAttribute(
         'target'
       );
