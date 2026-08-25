@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- V18.36 FINAL：LINE Pay 即時交接；hidden iframe 回應以 postMessage 直接把 paymentUrl 傳給 LIFF 頂層，polling 僅作備援 -->
+<!-- V18.37 FINAL：LINE Pay 冪等重送；既有付款網址直接重用；postMessage 成功/失敗即時交接，polling 僅作備援 -->
 <!-- 根因：V18.34 的 isNewMultiStoreOnlinePayment() 只允許 TP/HC，TC LINE Pay 實際未進 polling。 -->
 
 <!-- V18.33 FINAL：修正台中舊 QR 無 store=TC 導致 LINE Pay 沒進 iframe/polling 分支 -->
@@ -1471,19 +1471,34 @@ async function openExternalPayment(){
 // V18.36：Apps Script hidden iframe 一取得 LINE Pay paymentUrl，
 // 直接以 postMessage 傳回目前 GitHub / LIFF 頂層頁。
 // 不再必須等待試算表寫入後由 polling 重新讀回。
+let LINEPAY_REDIRECTING = false;
+
 window.addEventListener('message', function(event){
   try {
     const frame = document.getElementById('submitFrame');
     if (!frame || event.source !== frame.contentWindow) return;
 
     const data = event.data || {};
+    const btn = document.getElementById('submitBtn');
+    const progress = document.getElementById('payProgress');
+
+    if (data.type === 'YOKA_LINEPAY_ERROR') {
+      const msg = String(data.message || 'LINE Pay 付款建立失敗，請再試一次。').trim();
+      if (progress) progress.style.display = 'none';
+      showError(msg);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '下一步｜LINE Pay付款';
+      }
+      return;
+    }
+
     if (data.type !== 'YOKA_LINEPAY_READY') return;
 
     const paymentUrl = String(data.paymentUrl || '').trim();
     if (!paymentUrl || !/^https:\/\//i.test(paymentUrl)) return;
-
-    const btn = document.getElementById('submitBtn');
-    const progress = document.getElementById('payProgress');
+    if (LINEPAY_REDIRECTING) return;
+    LINEPAY_REDIRECTING = true;
 
     if (btn) {
       btn.disabled = true;
@@ -1495,7 +1510,7 @@ window.addEventListener('message', function(event){
     }
 
     PAYMENT_URL = paymentUrl;
-    window.location.href = paymentUrl;
+    window.location.replace(paymentUrl);
   } catch (err) {
     console.warn('LINE Pay 即時交接失敗，改由 polling 備援', err);
   }
@@ -1605,8 +1620,12 @@ async function waitForPaymentRedirect(){
 
           // 完全採台北／新竹已正常運作方式：
           // 由 GitHub 頂層頁直接轉址到 LINE Pay。
-          window.location.href =
-            res.paymentUrl;
+          if (!LINEPAY_REDIRECTING) {
+            LINEPAY_REDIRECTING = true;
+            window.location.replace(
+              res.paymentUrl
+            );
+          }
 
 
           return;
