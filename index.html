@@ -1,6 +1,5 @@
 <!doctype html>
-<!-- RECOVERY BASE: V18.5 — 已實測可搭配 V18.7 LINE Pay 正常 -->
-
+<!-- V18.25 台中：完整同步多門市付款交接 -->
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -20,7 +19,6 @@
     .order-no{font-size:22px;font-weight:900}
     .product{font-size:17px;color:#555;margin-top:12px;line-height:1.55}
     .total{font-size:24px;font-weight:900;margin-top:14px}
-    .payment-method{margin-top:14px;padding:12px 14px;border-radius:12px;background:#eef6ff;color:#174a7e;font-size:15px;font-weight:800;line-height:1.55}
     .line-status{font-size:15px;font-weight:700;margin:0 0 16px;color:#777}
     .friend{display:none;background:#fff7df;border:1px solid #ead58d;border-radius:14px;padding:16px;margin-bottom:18px;color:#6f5200;line-height:1.55}
     .friend.show{display:block}
@@ -37,7 +35,7 @@
     .submit{background:#222;color:#fff;margin-top:24px}
     .submit:disabled{opacity:.45}
     .error{display:none;margin-top:14px;background:#fff0f0;color:#a40000;border-radius:12px;padding:12px 14px;line-height:1.5}
-    .payment-next{display:none;width:100%;background:#fff;border-radius:20px;padding:30px 20px;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.05)}
+    .payment-next{display:none;background:#fff;border-radius:20px;padding:26px 18px;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.05)}
     .payment-next h2{margin:0 0 10px;font-size:25px}
     .payment-next .payment-order{font-size:17px;font-weight:800;margin:10px 0}
     .payment-next .payment-amount{font-size:24px;font-weight:900;margin:12px 0}
@@ -52,32 +50,6 @@
       .order{padding:17px}
     }
   </style>
-
-<style id="yoka-tc-linepay-mobile-v18">
-  @media (max-width: 600px) {
-    body { font-size: 16px; }
-    .wrap, .container, #app {
-      width: 100%;
-      max-width: 100%;
-    }
-    button, input, textarea, select {
-      font-size: 16px;
-    }
-    #submitBtn {
-      width: 100%;
-      min-height: 56px;
-      font-size: 17px;
-      font-weight: 900;
-      border-radius: 14px;
-    }
-    .payment-method-hint,
-    #paymentMethodBox {
-      line-height: 1.6;
-      font-size: 14px;
-    }
-  }
-</style>
-
 </head>
 <body>
 <div class="page">
@@ -93,7 +65,6 @@
       <div id="orderNo" class="order-no"></div>
       <div id="product" class="product"></div>
       <div id="total" class="total"></div>
-      <div id="paymentMethodBox" class="payment-method" style="display:none"></div>
     </div>
 
     <div id="lineStatus" class="line-status">LINE 身分連結中...</div>
@@ -466,21 +437,6 @@ function readOrderParamsAfterLiffInit(){
 }
 
 
-function getPaymentMethodHint(method){
-  const value=String(method||'').trim();
-  const map={
-    '現金':'付款方式：現金｜請於現場完成付款。',
-    '信用卡':'付款方式：信用卡／行動支付｜資料送出後請繼續完成線上付款。',
-    '匯款':'付款方式：銀行匯款｜訂單成立後 LINE 將發送匯款帳號與後五碼回報按鈕。',
-    'LINE Pay':'付款方式：LINE Pay｜填完收件資料後，下一步會直接進入 LINE Pay 付款。',
-    '貨到付款':'付款方式：貨到付款｜商品配送／到貨時再支付款項。'
-  };
-  return map[value]||(value?'付款方式：'+value:'');
-}
-function renderPaymentMethodHint(){
-  const box=document.getElementById('paymentMethodBox'); if(!box) return; const text=getPaymentMethodHint(PAYMENT_METHOD); box.textContent=text; box.style.display=text?'block':'none';
-}
-
 async function loadOrderMeta(){
 
   try{
@@ -610,9 +566,6 @@ async function loadOrderMeta(){
       String(
         res.paymentMethod || ''
       ).trim();
-
-
-    renderPaymentMethodHint();
 
 
     const address =
@@ -888,28 +841,17 @@ function updateSubmit(){
       STORE_CODE === 'TP' ||
       STORE_CODE === 'HC';
 
-    if(
-      PAYMENT_METHOD ===
-      'LINE Pay'
-    ){
+    const needsOnlinePayment =
+      PAYMENT_METHOD === '信用卡' ||
+      PAYMENT_METHOD === 'LINE Pay';
 
-      btn.textContent =
-        '下一步｜LINE Pay付款';
-
-    } else if(
-      isNewMultiStore &&
-      PAYMENT_METHOD ===
-        '信用卡'
-    ){
-
-      btn.textContent =
-        '下一步｜付款';
-
-    } else {
-
-      btn.textContent =
-        '確認送出收件資料';
-    }
+    btn.textContent =
+      (
+        isNewMultiStore &&
+        needsOnlinePayment
+      )
+        ? '下一步｜付款'
+        : '確認送出收件資料';
 
   } else if(
     LIFF_OK &&
@@ -1195,23 +1137,12 @@ function isNewMultiStoreOnlinePayment(){
 
   return (
     (
-      (
-        STORE_CODE === 'TP' ||
-        STORE_CODE === 'HC'
-      )
-      &&
-      (
-        PAYMENT_METHOD === '信用卡' ||
-        PAYMENT_METHOD === 'LINE Pay'
-      )
+      STORE_CODE === 'TP' ||
+      STORE_CODE === 'HC'
     )
-    ||
+    &&
     (
-      (
-        !STORE_CODE ||
-        STORE_CODE === 'TC'
-      )
-      &&
+      PAYMENT_METHOD === '信用卡' ||
       PAYMENT_METHOD === 'LINE Pay'
     )
   );
@@ -1274,7 +1205,19 @@ function showExternalCreditPayment(
 }
 
 
-async function openExternalPayment(){
+function openExternalPayment(){
+
+  if(
+    !PAYMENT_URL
+  ){
+
+    showError(
+      '付款連結尚未準備完成，請稍後再試。'
+    );
+
+    return;
+  }
+
 
   const btn =
     document.getElementById(
@@ -1286,170 +1229,70 @@ async function openExternalPayment(){
     true;
 
   btn.textContent =
-    '正在建立安全付款...';
+    '正在開啟付款頁...';
 
 
   try{
 
-    const url =
-      new URL(
-        API_URL
-      );
-
-
-    url.searchParams.set(
-      'action',
-      'getNewebpayFormData'
-    );
-
-    url.searchParams.set(
-      'orderNo',
-      ORDER_NO
-    );
-
-    url.searchParams.set(
-      'token',
-      TOKEN
-    );
-
-
-    const response =
-      await fetch(
-        url.toString(),
-        {
-          method:
-            'GET',
-          cache:
-            'no-store'
-        }
-      );
-
-
     if(
-      !response.ok
-    ){
-      throw new Error(
-        '付款資料讀取失敗'
-      );
-    }
-
-
-    const data =
-      await response.json();
-
-
-    if(
-      !data ||
-      !data.success
+      window.liff &&
+      typeof liff.openWindow ===
+        'function'
     ){
 
-      throw new Error(
-        (
-          data &&
-          data.message
-        )
-          ? data.message
-          : '無法建立付款資料'
+      liff.openWindow({
+        url:
+          PAYMENT_URL,
+        external:
+          true
+      });
+
+
+      setTimeout(
+        function(){
+
+          btn.disabled =
+            false;
+
+          btn.textContent =
+            '再次開啟安全付款';
+        },
+        1200
       );
+
+
+      return;
     }
-
-
-    const form =
-      document.createElement(
-        'form'
-      );
-
-
-    form.method =
-      'POST';
-
-    form.action =
-      data.gatewayUrl;
-
-    form.style.display =
-      'none';
-
-
-    [
-      'MerchantID',
-      'TradeInfo',
-      'TradeSha',
-      'Version'
-    ].forEach(
-      function(name){
-
-        const input =
-          document.createElement(
-            'input'
-          );
-
-
-        input.type =
-          'hidden';
-
-        input.name =
-          name;
-
-        input.value =
-          String(
-            data[name] || ''
-          );
-
-
-        form.appendChild(
-          input
-        );
-      }
-    );
-
-
-    document.body.appendChild(
-      form
-    );
-
-
-    btn.textContent =
-      '正在前往藍新付款...';
-
-
-    // 標準前景 HTML Form POST：
-    // 由目前頂層 GitHub 頁面直接提交到藍新 MPG。
-    form.submit();
-
 
   }catch(err){
 
-    console.error(
+    console.warn(
+      'LIFF 外部瀏覽器開啟失敗',
       err
     );
-
-
-    btn.disabled =
-      false;
-
-    btn.textContent =
-      '前往安全付款';
-
-
-    const box =
-      document.getElementById(
-        'errorBox'
-      );
-
-
-    if(box){
-
-      box.style.display =
-        'block';
-
-      box.textContent =
-        err &&
-        err.message
-          ? err.message
-          : '付款頁建立失敗，請稍後再試。';
-    }
   }
+
+
+  // 非 LIFF / 不支援時的備援。
+  window.open(
+    PAYMENT_URL,
+    '_blank'
+  );
+
+
+  setTimeout(
+    function(){
+
+      btn.disabled =
+        false;
+
+      btn.textContent =
+        '再次開啟安全付款';
+    },
+    1200
+  );
 }
+
 
 async function waitForPaymentRedirect(){
 
@@ -1527,7 +1370,7 @@ async function waitForPaymentRedirect(){
               '付款連結已準備完成';
 
             showExternalCreditPayment(
-              ''
+              res.paymentUrl
             );
 
             return;
@@ -1584,233 +1427,7 @@ async function waitForPaymentRedirect(){
     false;
 
   btn.textContent =
-    PAYMENT_METHOD ===
-      'LINE Pay'
-      ? '下一步｜LINE Pay付款'
-      : '下一步｜付款';
-}
-
-
-function showFastSubmitSuccess(){
-
-  document
-    .getElementById(
-      'app'
-    )
-    .style.display =
-      'none';
-
-
-  const panel =
-    document.getElementById(
-      'paymentNext'
-    );
-
-
-  panel.style.display =
-    'block';
-
-
-  const title =
-    panel.querySelector(
-      'h2'
-    );
-
-
-  if(title){
-
-    title.textContent =
-      PAYMENT_METHOD ===
-        '匯款'
-        ? '收件資料已完成'
-        : '訂單資料已完成';
-  }
-
-
-  document
-    .getElementById(
-      'paymentOrderNo'
-    )
-    .textContent =
-      '訂單編號：' +
-      ORDER_NO;
-
-
-  document
-    .getElementById(
-      'paymentAmount'
-    )
-    .textContent =
-      '訂單金額：' +
-      money(
-        TOTAL
-      );
-
-
-  const hint =
-    panel.querySelector(
-      '.payment-hint'
-    );
-
-
-  if(hint){
-
-    hint.textContent =
-      PAYMENT_METHOD ===
-        '匯款'
-        ? '匯款資訊與「回報匯款後五碼」按鈕將傳送至您的 LINE。'
-        : '訂單已建立，相關訂單通知將同步傳送至您的 LINE。';
-  }
-
-
-  const openBtn =
-    document.getElementById(
-      'openPaymentBtn'
-    );
-
-
-  if(openBtn){
-
-    openBtn.style.display =
-      'none';
-  }
-
-
-  const backup =
-    panel.querySelector(
-      '.payment-backup'
-    );
-
-
-  if(backup){
-
-    backup.textContent =
-      '您現在可以關閉此頁面。';
-  }
-
-
-  window.scrollTo(
-    0,
-    0
-  );
-}
-
-
-async function waitForCustomerSubmitComplete(){
-
-  const btn =
-    document.getElementById(
-      'submitBtn'
-    );
-
-
-  for(
-    let attempt = 0;
-    attempt < 40;
-    attempt++
-  ){
-
-    try{
-
-      const url =
-        new URL(
-          API_URL
-        );
-
-
-      url.searchParams.set(
-        'action',
-        'getCustomerOrder'
-      );
-
-
-      url.searchParams.set(
-        'orderNo',
-        ORDER_NO
-      );
-
-
-      url.searchParams.set(
-        'token',
-        TOKEN
-      );
-
-
-      url.searchParams.set(
-        '_ts',
-        String(
-          Date.now()
-        )
-      );
-
-
-      const response =
-        await fetch(
-          url.toString(),
-          {
-            method:
-              'GET',
-            redirect:
-              'follow',
-            cache:
-              'no-store'
-          }
-        );
-
-
-      if(
-        response.ok
-      ){
-
-        const res =
-          await response.json();
-
-
-        if(
-          res &&
-          res.success &&
-          (
-            res.customerDataComplete ||
-            res.orderStatus ===
-              '訂單成立'
-          )
-        ){
-
-          showFastSubmitSuccess();
-
-          return;
-        }
-      }
-
-    }catch(err){
-
-      console.warn(
-        '等待訂單資料完成失敗',
-        err
-      );
-    }
-
-
-    await new Promise(
-      resolve =>
-        setTimeout(
-          resolve,
-          350
-        )
-    );
-  }
-
-
-  // 即使輪詢逾時，背景 POST 仍可能已完成。
-  // 不讓畫面永久卡在「資料送出中」。
-  showFastSubmitSuccess();
-
-
-  if(btn){
-
-    btn.disabled =
-      false;
-  }
+    '下一步｜付款';
 }
 
 
@@ -1913,15 +1530,12 @@ document
 
 
       btn.textContent =
-        PAYMENT_METHOD ===
-          'LINE Pay'
-          ? '正在建立 LINE Pay 付款...'
-          : '資料送出中...';
+        '資料送出中...';
 
 
-      // 台北／新竹信用卡、LINE Pay，以及台中 LINE Pay：
-      // 收件資料背景送出，GitHub 頁面保留控制權，
-      // 後端建立付款網址後立即跳轉。
+      // 台北／新竹的信用卡與 LINE Pay：
+      // POST 到隱藏 iframe，讓 GitHub 頂層頁面保留控制權，
+      // 後端完成後由 GitHub 自己跳轉付款頁。
       if(
         isNewMultiStoreOnlinePayment()
       ){
@@ -1940,18 +1554,12 @@ document
       }
 
 
-      // 其餘付款也改成背景送單。
-      // 客戶頁不再等待 Apps Script 把 LINE 推播、報表刷新等全部完成，
-      // 前端只要偵測到姓名／電話／地址已寫入，就立即顯示完成。
-      this.target =
-        'submitFrame';
+      // 台中舊系統與非線上付款維持原本流程。
+      this.removeAttribute(
+        'target'
+      );
 
       this.submit();
-
-      btn.textContent =
-        '正在確認訂單...';
-
-      waitForCustomerSubmitComplete();
     }
   );
 
