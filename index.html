@@ -35,7 +35,7 @@
     .submit{background:#222;color:#fff;margin-top:24px}
     .submit:disabled{opacity:.45}
     .error{display:none;margin-top:14px;background:#fff0f0;color:#a40000;border-radius:12px;padding:12px 14px;line-height:1.5}
-    .payment-next{display:none;background:#fff;border-radius:20px;padding:26px 18px;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.05)}
+    .payment-next{display:none;width:100%;background:#fff;border-radius:20px;padding:30px 20px;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.05)}
     .payment-next h2{margin:0 0 10px;font-size:25px}
     .payment-next .payment-order{font-size:17px;font-weight:800;margin:10px 0}
     .payment-next .payment-amount{font-size:24px;font-weight:900;margin:12px 0}
@@ -1589,6 +1589,229 @@ async function waitForPaymentRedirect(){
 }
 
 
+function showFastSubmitSuccess(){
+
+  document
+    .getElementById(
+      'app'
+    )
+    .style.display =
+      'none';
+
+
+  const panel =
+    document.getElementById(
+      'paymentNext'
+    );
+
+
+  panel.style.display =
+    'block';
+
+
+  const title =
+    panel.querySelector(
+      'h2'
+    );
+
+
+  if(title){
+
+    title.textContent =
+      PAYMENT_METHOD ===
+        '匯款'
+        ? '收件資料已完成'
+        : '訂單資料已完成';
+  }
+
+
+  document
+    .getElementById(
+      'paymentOrderNo'
+    )
+    .textContent =
+      '訂單編號：' +
+      ORDER_NO;
+
+
+  document
+    .getElementById(
+      'paymentAmount'
+    )
+    .textContent =
+      '訂單金額：' +
+      money(
+        TOTAL
+      );
+
+
+  const hint =
+    panel.querySelector(
+      '.payment-hint'
+    );
+
+
+  if(hint){
+
+    hint.textContent =
+      PAYMENT_METHOD ===
+        '匯款'
+        ? '匯款資訊與「回報匯款後五碼」按鈕將傳送至您的 LINE。'
+        : '訂單已建立，相關訂單通知將同步傳送至您的 LINE。';
+  }
+
+
+  const openBtn =
+    document.getElementById(
+      'openPaymentBtn'
+    );
+
+
+  if(openBtn){
+
+    openBtn.style.display =
+      'none';
+  }
+
+
+  const backup =
+    panel.querySelector(
+      '.payment-backup'
+    );
+
+
+  if(backup){
+
+    backup.textContent =
+      '您現在可以關閉此頁面。';
+  }
+
+
+  window.scrollTo(
+    0,
+    0
+  );
+}
+
+
+async function waitForCustomerSubmitComplete(){
+
+  const btn =
+    document.getElementById(
+      'submitBtn'
+    );
+
+
+  for(
+    let attempt = 0;
+    attempt < 40;
+    attempt++
+  ){
+
+    try{
+
+      const url =
+        new URL(
+          API_URL
+        );
+
+
+      url.searchParams.set(
+        'action',
+        'getCustomerOrder'
+      );
+
+
+      url.searchParams.set(
+        'orderNo',
+        ORDER_NO
+      );
+
+
+      url.searchParams.set(
+        'token',
+        TOKEN
+      );
+
+
+      url.searchParams.set(
+        '_ts',
+        String(
+          Date.now()
+        )
+      );
+
+
+      const response =
+        await fetch(
+          url.toString(),
+          {
+            method:
+              'GET',
+            redirect:
+              'follow',
+            cache:
+              'no-store'
+          }
+        );
+
+
+      if(
+        response.ok
+      ){
+
+        const res =
+          await response.json();
+
+
+        if(
+          res &&
+          res.success &&
+          (
+            res.customerDataComplete ||
+            res.orderStatus ===
+              '訂單成立'
+          )
+        ){
+
+          showFastSubmitSuccess();
+
+          return;
+        }
+      }
+
+    }catch(err){
+
+      console.warn(
+        '等待訂單資料完成失敗',
+        err
+      );
+    }
+
+
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          350
+        )
+    );
+  }
+
+
+  // 即使輪詢逾時，背景 POST 仍可能已完成。
+  // 不讓畫面永久卡在「資料送出中」。
+  showFastSubmitSuccess();
+
+
+  if(btn){
+
+    btn.disabled =
+      false;
+  }
+}
+
+
 document
   .getElementById(
     'customerForm'
@@ -1715,12 +1938,18 @@ document
       }
 
 
-      // 其餘非線上付款維持一般送出流程。
-      this.removeAttribute(
-        'target'
-      );
+      // 其餘付款也改成背景送單。
+      // 客戶頁不再等待 Apps Script 把 LINE 推播、報表刷新等全部完成，
+      // 前端只要偵測到姓名／電話／地址已寫入，就立即顯示完成。
+      this.target =
+        'submitFrame';
 
       this.submit();
+
+      btn.textContent =
+        '正在確認訂單...';
+
+      waitForCustomerSubmitComplete();
     }
   );
 
