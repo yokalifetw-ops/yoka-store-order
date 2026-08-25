@@ -1,7 +1,9 @@
+<!-- V18.44 FINAL：前端沿用 V18.42 已正常首次付款流程；此次只修後端 TP/HC/TC LINE Pay 核心隔離 -->
 <!-- V18.42 FINAL：LINE Pay 付款連結直接使用 web-pay.line.me 原始 paymentUrl；完全同步台北／新竹 -->
 <!-- V18.40 FINAL：LINE Pay 原付款頁續付版；待付款重開原 paymentUrl，已付款顯示完成 -->
 <!-- V18.39 FINAL：LINE Pay 可重複續付；前端付款流程沿用 V18.38 -->
 <!doctype html>
+<!-- V18.44 FINAL：TP／HC／TC LINE Pay 三門市統一訂單編號與付款核心；台中不再使用特殊 provider orderId -->
 <!-- V18.38 FINAL：LINE Pay 冪等重送；既有付款網址直接重用；postMessage 成功/失敗即時交接，polling 僅作備援 -->
 <!-- 根因：V18.34 的 isNewMultiStoreOnlinePayment() 只允許 TP/HC，TC LINE Pay 實際未進 polling。 -->
 
