@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- V18.35 FINAL：修正 TC LINE Pay 分流；台中改採 hidden iframe POST + API polling + GitHub 頂層直接轉址 -->
+<!-- V18.36 FINAL：LINE Pay 即時交接；hidden iframe 回應以 postMessage 直接把 paymentUrl 傳給 LIFF 頂層，polling 僅作備援 -->
 <!-- 根因：V18.34 的 isNewMultiStoreOnlinePayment() 只允許 TP/HC，TC LINE Pay 實際未進 polling。 -->
 
 <!-- V18.33 FINAL：修正台中舊 QR 無 store=TC 導致 LINE Pay 沒進 iframe/polling 分支 -->
@@ -1467,6 +1467,39 @@ async function openExternalPayment(){
     }
   }
 }
+
+// V18.36：Apps Script hidden iframe 一取得 LINE Pay paymentUrl，
+// 直接以 postMessage 傳回目前 GitHub / LIFF 頂層頁。
+// 不再必須等待試算表寫入後由 polling 重新讀回。
+window.addEventListener('message', function(event){
+  try {
+    const frame = document.getElementById('submitFrame');
+    if (!frame || event.source !== frame.contentWindow) return;
+
+    const data = event.data || {};
+    if (data.type !== 'YOKA_LINEPAY_READY') return;
+
+    const paymentUrl = String(data.paymentUrl || '').trim();
+    if (!paymentUrl || !/^https:\/\//i.test(paymentUrl)) return;
+
+    const btn = document.getElementById('submitBtn');
+    const progress = document.getElementById('payProgress');
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '正在前往 LINE Pay 付款...';
+    }
+    if (progress) {
+      progress.style.display = 'block';
+      progress.textContent = '付款頁已準備完成，正在開啟 LINE Pay…';
+    }
+
+    PAYMENT_URL = paymentUrl;
+    window.location.href = paymentUrl;
+  } catch (err) {
+    console.warn('LINE Pay 即時交接失敗，改由 polling 備援', err);
+  }
+});
 
 async function waitForPaymentRedirect(){
 
