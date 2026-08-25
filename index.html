@@ -1193,12 +1193,23 @@ function isNewMultiStoreOnlinePayment(){
 
   return (
     (
-      STORE_CODE === 'TP' ||
-      STORE_CODE === 'HC'
+      (
+        STORE_CODE === 'TP' ||
+        STORE_CODE === 'HC'
+      )
+      &&
+      (
+        PAYMENT_METHOD === '信用卡' ||
+        PAYMENT_METHOD === 'LINE Pay'
+      )
     )
-    &&
+    ||
     (
-      PAYMENT_METHOD === '信用卡' ||
+      (
+        !STORE_CODE ||
+        STORE_CODE === 'TC'
+      )
+      &&
       PAYMENT_METHOD === 'LINE Pay'
     )
   );
@@ -1571,7 +1582,10 @@ async function waitForPaymentRedirect(){
     false;
 
   btn.textContent =
-    '下一步｜付款';
+    PAYMENT_METHOD ===
+      'LINE Pay'
+      ? '下一步｜LINE Pay付款'
+      : '下一步｜付款';
 }
 
 
@@ -1680,9 +1694,9 @@ document
           : '資料送出中...';
 
 
-      // 台北／新竹的信用卡與 LINE Pay：
-      // POST 到隱藏 iframe，讓 GitHub 頂層頁面保留控制權，
-      // 後端完成後由 GitHub 自己跳轉付款頁。
+      // 台北／新竹信用卡、LINE Pay，以及台中 LINE Pay：
+      // 收件資料背景送出，GitHub 頁面保留控制權，
+      // 後端建立付款網址後立即跳轉。
       if(
         isNewMultiStoreOnlinePayment()
       ){
@@ -1701,7 +1715,7 @@ document
       }
 
 
-      // 台中 LINE Pay 由 Apps Script 接收資料後立即建立付款並直接跳轉；其他付款也維持原本流程。
+      // 其餘非線上付款維持一般送出流程。
       this.removeAttribute(
         'target'
       );
