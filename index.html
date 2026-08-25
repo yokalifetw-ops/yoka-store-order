@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- V18.33 FINAL：修正台中舊 QR 無 store=TC 導致 LINE Pay 沒進 iframe/polling 分支 -->
+
 <!-- V18.32 FINAL：修正 V18.31 的 API_BASE 未定義；TC LINE Pay 完整採台北/新竹 iframe + API_URL polling + 頂層直接轉址 -->
 
 <!-- ============================================================
@@ -398,10 +400,11 @@ function readOrderParamsAfterLiffInit(){
 
   STORE_CODE =
     String(
-      qs.get('store') || ''
+      qs.get('store') || 'TC'
     )
       .trim()
-      .toUpperCase();
+      .toUpperCase() ||
+    'TC';
 
 
   // 防呆：若某些環境仍殘留 liff.state，僅讀取、不修改它。
@@ -473,6 +476,17 @@ function readOrderParamsAfterLiffInit(){
       );
     }
   }
+
+  // 台中舊 QR 本來沒有 store=TC。
+  // 因此沒有 store 參數時一律視為台中，確保 LINE Pay 走與台北／新竹相同付款交接。
+  STORE_CODE =
+    String(
+      STORE_CODE || 'TC'
+    )
+      .trim()
+      .toUpperCase() ||
+    'TC';
+
 }
 
 
@@ -1203,10 +1217,9 @@ async function initApp(){
 
 function isNewMultiStoreOnlinePayment(){
 
-  // 台北／新竹：信用卡、LINE Pay 使用 iframe + polling。
-  // 台中：LINE Pay 也使用相同交接方式。
-  // 這樣 Apps Script 在背景建立付款網址，
-  // GitHub 頂層頁拿到 paymentUrl 後直接 window.location.href 跳付款頁。
+  // 台北／新竹：信用卡、LINE Pay。
+  // 台中：LINE Pay。
+  // 舊台中 QR 沒有 store 參數也會被 readOrderParamsAfterLiffInit() 正規化為 TC。
   return (
     (
       STORE_CODE === 'TP' ||
