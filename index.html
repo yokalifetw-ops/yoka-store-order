@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- V18.34 FINAL：TC LINE Pay 頂層 POST；由 Apps Script meta refresh 直接轉付款頁 -->
+<!-- V18.35 FINAL：修正 TC LINE Pay 分流；台中改採 hidden iframe POST + API polling + GitHub 頂層直接轉址 -->
+<!-- 根因：V18.34 的 isNewMultiStoreOnlinePayment() 只允許 TP/HC，TC LINE Pay 實際未進 polling。 -->
 
 <!-- V18.33 FINAL：修正台中舊 QR 無 store=TC 導致 LINE Pay 沒進 iframe/polling 分支 -->
 
@@ -1219,19 +1220,17 @@ async function initApp(){
 
 function isNewMultiStoreOnlinePayment(){
 
-  // 台北／新竹維持既有 iframe + polling。
-  // 台中 LINE Pay 不走 iframe：直接頂層 POST 到 Apps Script，
-  // 後端回傳含 meta refresh 的付款頁，瀏覽器原生直接轉到 LINE Pay。
+  // V18.35：所有門市的 LINE Pay 一律走 hidden iframe POST + API polling。
+  // 付款網址由 Apps Script 建立並寫回試算表後，GitHub 頂層頁直接 window.location.href 跳轉。
+  // 這可避開 Apps Script HtmlService / LIFF WebView 對 meta refresh、window.top 導航的限制。
+  if (PAYMENT_METHOD === 'LINE Pay') {
+    return true;
+  }
+
+  // 信用卡目前只保留台北／新竹既有線上付款分支。
   return (
-    (
-      STORE_CODE === 'TP' ||
-      STORE_CODE === 'HC'
-    )
-    &&
-    (
-      PAYMENT_METHOD === '信用卡' ||
-      PAYMENT_METHOD === 'LINE Pay'
-    )
+    (STORE_CODE === 'TP' || STORE_CODE === 'HC') &&
+    PAYMENT_METHOD === '信用卡'
   );
 }
 
@@ -1748,9 +1747,9 @@ document
           : '資料送出中...';
 
 
-      // 台北／新竹信用卡、LINE Pay，以及台中 LINE Pay：
+      // V18.35：所有門市 LINE Pay，以及台北／新竹信用卡：
       // 收件資料背景送出，GitHub 頁面保留控制權，
-      // 後端建立付款網址後立即跳轉。
+      // 後端建立付款網址並寫入後，由 polling 取得 URL 立即頂層跳轉。
       if(
         isNewMultiStoreOnlinePayment()
       ){
@@ -1772,8 +1771,8 @@ document
       }
 
 
-      // 台中 LINE Pay：頂層 POST。
-      // Apps Script 回應頁使用瀏覽器原生 meta refresh 直接進 LINE Pay。
+      // 其餘付款方式維持一般頂層 POST。
+      // LINE Pay 不應進入此分支；若進入代表付款方式或訂單資料未正確載入。
       this.removeAttribute(
         'target'
       );
