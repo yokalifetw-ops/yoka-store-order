@@ -50,6 +50,32 @@
       .order{padding:17px}
     }
   </style>
+
+<style id="yoka-tc-linepay-mobile-v18">
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    .wrap, .container, #app {
+      width: 100%;
+      max-width: 100%;
+    }
+    button, input, textarea, select {
+      font-size: 16px;
+    }
+    #submitBtn {
+      width: 100%;
+      min-height: 56px;
+      font-size: 17px;
+      font-weight: 900;
+      border-radius: 14px;
+    }
+    .payment-method-hint,
+    #paymentMethodBox {
+      line-height: 1.6;
+      font-size: 14px;
+    }
+  }
+</style>
+
 </head>
 <body>
 <div class="page">
@@ -444,7 +470,7 @@ function getPaymentMethodHint(method){
     '現金':'付款方式：現金｜請於現場完成付款。',
     '信用卡':'付款方式：信用卡／行動支付｜資料送出後請繼續完成線上付款。',
     '匯款':'付款方式：銀行匯款｜訂單成立後 LINE 將發送匯款帳號與後五碼回報按鈕。',
-    'LINE Pay':'付款方式：LINE Pay｜資料送出後請繼續完成 LINE Pay 付款。',
+    'LINE Pay':'付款方式：LINE Pay｜填完收件資料後，下一步會直接進入 LINE Pay 付款。',
     '貨到付款':'付款方式：貨到付款｜商品配送／到貨時再支付款項。'
   };
   return map[value]||(value?'付款方式：'+value:'');
@@ -860,17 +886,28 @@ function updateSubmit(){
       STORE_CODE === 'TP' ||
       STORE_CODE === 'HC';
 
-    const needsOnlinePayment =
-      PAYMENT_METHOD === '信用卡' ||
-      PAYMENT_METHOD === 'LINE Pay';
+    if(
+      PAYMENT_METHOD ===
+      'LINE Pay'
+    ){
 
-    btn.textContent =
-      (
-        isNewMultiStore &&
-        needsOnlinePayment
-      )
-        ? '下一步｜付款'
-        : '確認送出收件資料';
+      btn.textContent =
+        '下一步｜LINE Pay付款';
+
+    } else if(
+      isNewMultiStore &&
+      PAYMENT_METHOD ===
+        '信用卡'
+    ){
+
+      btn.textContent =
+        '下一步｜付款';
+
+    } else {
+
+      btn.textContent =
+        '確認送出收件資料';
+    }
 
   } else if(
     LIFF_OK &&
@@ -1637,7 +1674,10 @@ document
 
 
       btn.textContent =
-        '資料送出中...';
+        PAYMENT_METHOD ===
+          'LINE Pay'
+          ? '正在建立 LINE Pay 付款...'
+          : '資料送出中...';
 
 
       // 台北／新竹的信用卡與 LINE Pay：
@@ -1661,7 +1701,7 @@ document
       }
 
 
-      // 台中舊系統與非線上付款維持原本流程。
+      // 台中 LINE Pay 由 Apps Script 接收資料後立即建立付款並直接跳轉；其他付款也維持原本流程。
       this.removeAttribute(
         'target'
       );
