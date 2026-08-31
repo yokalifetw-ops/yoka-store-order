@@ -1,3 +1,4 @@
+<!-- V18.50：修復 TP/HC 信用卡回到 V16 已驗證藍新頂層 Form POST；LINE Pay V18.49 流程不動。 -->
 <!-- V18.49：LINE 推播改為直接付款優先；前端首次付款流程沿用 V18.48。 -->
 <!-- V18.47：前端沿用 V18.46；本版只修後端 LINE Push 不再人工拼 Universal URL -->
 <!-- V18.45：後端 LINE 推播改用 paymentUrl.app；前端付款流程維持 V18.44 -->
@@ -166,11 +167,11 @@ TC LINE Pay：hidden iframe POST → GitHub polling → window.location.href pay
     <div id="paymentOrderNo" class="payment-order"></div>
     <div id="paymentAmount" class="payment-amount"></div>
     <div class="payment-hint">
-      為確保信用卡、Apple Pay、Google Pay、Samsung Pay 付款流程正常，
-      請使用外部瀏覽器開啟藍新安全付款頁。
+      請繼續前往藍新安全付款頁，可使用信用卡、Apple Pay
+      及商店已開通的行動支付方式。
     </div>
     <button id="openPaymentBtn" type="button" class="payment-open" onclick="openExternalPayment()">
-      前往安全付款
+      前往藍新安全付款
     </button>
     <div class="payment-backup">
       付款連結也會同步傳送至 LINE，若中途關閉頁面可由 LINE 再次開啟。
@@ -505,7 +506,7 @@ function getPaymentMethodHint(method){
   const value=String(method||'').trim();
   const map={
     '現金':'付款方式：現金｜請於現場完成付款。',
-    '信用卡':'付款方式：信用卡／行動支付｜資料送出後請繼續完成線上付款。',
+    '信用卡':'付款方式：信用卡｜資料送出後將進入藍新安全付款頁，可使用信用卡、Apple Pay 及已開通的行動支付。',
     '匯款':'付款方式：銀行匯款｜訂單成立後 LINE 將發送匯款帳號與後五碼回報按鈕。',
     'LINE Pay':'付款方式：LINE Pay｜填完收件資料後，下一步會直接進入 LINE Pay 付款。',
     '貨到付款':'付款方式：貨到付款｜商品配送／到貨時再支付款項。'
@@ -1453,7 +1454,7 @@ async function openExternalPayment(){
       false;
 
     btn.textContent =
-      '前往安全付款';
+      '前往藍新安全付款';
 
 
     const box =
@@ -1539,7 +1540,10 @@ async function waitForPaymentRedirect(){
 
   if (progress) {
     progress.style.display = 'block';
-    progress.textContent = '正在建立 LINE Pay 付款頁，請稍候…';
+    progress.textContent =
+      PAYMENT_METHOD === '信用卡'
+        ? '正在準備藍新信用卡付款頁，請稍候…'
+        : '正在建立 LINE Pay 付款頁，請稍候…';
   }
 
 
@@ -1633,18 +1637,54 @@ async function waitForPaymentRedirect(){
           res.paymentUrl
         ){
 
-          btn.textContent =
-            '正在前往 LINE Pay 付款...';
+          // ==================================================
+          // V18.50：信用卡恢復 V16 已實測成功流程
+          //
+          // 不進 Apps Script 的 neWebPay 中繼付款頁，
+          // 不使用 LINE Pay 的 window.location.replace。
+          // 訂單資料確認寫入後，顯示付款面板；
+          // 使用者按下按鈕時由 openExternalPayment()
+          // 在目前 GitHub / LIFF 頂層直接 Form POST 到藍新 MPG。
+          // ==================================================
+          if(
+            PAYMENT_METHOD ===
+            '信用卡'
+          ){
 
-          if (progress) {
-            progress.textContent = '付款頁已準備完成，正在開啟 LINE Pay…';
+            if (progress) {
+              progress.style.display =
+                'none';
+            }
+
+
+            btn.textContent =
+              '藍新付款頁已準備完成';
+
+
+            showExternalCreditPayment(
+              ''
+            );
+
+
+            return;
           }
 
 
-          // 完全採台北／新竹已正常運作方式：
-          // 由 GitHub 頂層頁直接轉址到 LINE Pay。
+          // LINE Pay 維持目前 V18.49 已使用的直接 paymentUrl 流程。
+          btn.textContent =
+            '正在前往 LINE Pay 付款...';
+
+
+          if (progress) {
+            progress.textContent =
+              '付款頁已準備完成，正在開啟 LINE Pay…';
+          }
+
+
           if (!LINEPAY_REDIRECTING) {
-            LINEPAY_REDIRECTING = true;
+            LINEPAY_REDIRECTING =
+              true;
+
             window.location.replace(
               res.paymentUrl
             );
@@ -1661,6 +1701,34 @@ async function waitForPaymentRedirect(){
           res.ready &&
           !res.paymentUrl
         ){
+
+          if(
+            PAYMENT_METHOD ===
+            '信用卡'
+          ){
+
+            if (progress) {
+              progress.style.display =
+                'none';
+            }
+
+
+            btn.disabled =
+              false;
+
+
+            btn.textContent =
+              '下一步｜付款';
+
+
+            showError(
+              '訂單已成立，但藍新付款頁尚未準備完成，請再按一次「下一步｜付款」。'
+            );
+
+
+            return;
+          }
+
 
           showError(
             '訂單已成立，但未取得 LINE Pay 付款網址，請重新開啟訂單。'
@@ -1703,17 +1771,37 @@ async function waitForPaymentRedirect(){
     progress.style.display = 'none';
   }
 
-  showError(
-    'LINE Pay 付款頁準備逾時。訂單已成立，請直接使用 LINE 收到的付款連結，或重新開啟此訂單。'
-  );
+  if(
+    PAYMENT_METHOD ===
+    '信用卡'
+  ){
+
+    showError(
+      '藍新付款頁準備逾時。訂單已成立，請再按一次「下一步｜付款」，或使用 LINE 收到的付款連結。'
+    );
 
 
-  btn.disabled =
-    false;
+    btn.disabled =
+      false;
 
 
-  btn.textContent =
-    '下一步｜LINE Pay付款';
+    btn.textContent =
+      '下一步｜付款';
+
+  } else {
+
+    showError(
+      'LINE Pay 付款頁準備逾時。訂單已成立，請直接使用 LINE 收到的付款連結，或重新開啟此訂單。'
+    );
+
+
+    btn.disabled =
+      false;
+
+
+    btn.textContent =
+      '下一步｜LINE Pay付款';
+  }
 }
 
 
@@ -1819,7 +1907,12 @@ document
         PAYMENT_METHOD ===
           'LINE Pay'
           ? '正在建立 LINE Pay 付款...'
-          : '資料送出中...';
+          : (
+              PAYMENT_METHOD ===
+                '信用卡'
+                ? '正在準備藍新付款...'
+                : '資料送出中...'
+            );
 
 
       // V18.35：所有門市 LINE Pay，以及台北／新竹信用卡：
@@ -1838,7 +1931,12 @@ document
           PAYMENT_METHOD ===
             'LINE Pay'
             ? '正在建立 LINE Pay 付款...'
-            : '訂單建立中...';
+            : (
+                PAYMENT_METHOD ===
+                  '信用卡'
+                  ? '正在準備藍新付款...'
+                  : '訂單建立中...'
+              );
 
         waitForPaymentRedirect();
 
